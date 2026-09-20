@@ -6,8 +6,13 @@ import { ChatInput } from './components/ChatInput';
 import { EmptyState } from './components/EmptyState';
 import { RoleModal } from './components/RoleModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ExtensionModal } from './components/ExtensionModal';
+import { AuthModal } from './components/AuthModal';
+import { UserProfileModal } from './components/UserProfileModal';
+import { BolexPlusModal } from './components/BolexPlusModal';
 import { PERSONA_ROLES } from './constants';
 import { ChatMessage, ChatSession, ImageAttachment, PersonaRole } from './types';
+import { useAuth } from './context/AuthContext';
 
 const STORAGE_KEY = 'smart_ai_assistant_sessions_v1';
 
@@ -47,9 +52,16 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isBolexPlusModalOpen, setIsBolexPlusModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Checking connection...');
   const [isLoading, setIsLoading] = useState(false);
+
+  const { profile } = useAuth();
 
   const activeSession =
     sessions.find((s) => s.id === activeSessionId) || sessions[0] || createDefaultSession();
@@ -194,7 +206,7 @@ export default function App() {
     md += `*Persona: ${currentRole.name} | Web Grounding: ${activeSession.enableSearch ? 'Yes' : 'No'}*\n\n---\n\n`;
 
     activeSession.messages.forEach((msg) => {
-      const sender = msg.role === 'user' ? '### 👤 User' : '### 🤖 Gemini 3.8';
+      const sender = msg.role === 'user' ? '### 👤 User' : '### 🤖 Bolex AI';
       md += `${sender} (${new Date(msg.timestamp).toLocaleTimeString()})\n\n`;
       if (msg.image) {
         md += `*[Attached Image: ${msg.image.name || 'image'}]*\n\n`;
@@ -281,8 +293,23 @@ export default function App() {
     abortControllerRef.current = controller;
 
     try {
-      // Compose system instruction (persona + custom prompt)
+      // Compose system instruction (persona + custom prompt + user profile context)
       let finalSystemPrompt = currentRole.systemPrompt;
+
+      if (profile?.displayName || profile?.bio) {
+        finalSystemPrompt += `\n\nUser Profile & Personalization:`;
+        if (profile.displayName) {
+          finalSystemPrompt += `\nUser's preferred name: ${profile.displayName}`;
+        }
+        if (profile.bio) {
+          finalSystemPrompt += `\nUser context & AI preferences: ${profile.bio}`;
+        }
+      }
+
+      if (profile?.isBolexPlus || profile?.planTier === 'plus') {
+        finalSystemPrompt += `\n\n[Bolex Plus Member Perks Active]: The user is an active Bolex Plus subscriber with priority reasoning depth, continuous microphone voice dictation, and real-time grounding capabilities. Provide structured, authoritative, and deeply reasoned answers.`;
+      }
+
       if (activeSession.customSystemPrompt?.trim()) {
         finalSystemPrompt += `\n\nAdditional user guidelines:\n${activeSession.customSystemPrompt.trim()}`;
       }
@@ -489,6 +516,13 @@ export default function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenExtension={() => setIsExtensionModalOpen(true)}
+        onOpenAuth={() => {
+          setAuthModalMode('signin');
+          setIsAuthModalOpen(true);
+        }}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
       />
 
       {/* Main chat column */}
@@ -498,6 +532,8 @@ export default function App() {
           currentRole={currentRole}
           onOpenRoles={() => setIsRoleModalOpen(true)}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onOpenExtension={() => setIsExtensionModalOpen(true)}
+          onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
           onNewChat={handleNewSession}
           onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
           enableSearch={activeSession.enableSearch}
@@ -506,6 +542,11 @@ export default function App() {
           }
           onExportChat={handleExportChat}
           onClearChat={handleClearChat}
+          onOpenAuth={() => {
+            setAuthModalMode('signin');
+            setIsAuthModalOpen(true);
+          }}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           hasMessages={activeSession.messages.length > 0}
           isBackendConnected={isBackendConnected}
         />
@@ -555,6 +596,7 @@ export default function App() {
           onToggleSearch={() =>
             updateActiveSession((s) => ({ ...s, enableSearch: !s.enableSearch }))
           }
+          onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
         />
       </div>
 
@@ -582,6 +624,33 @@ export default function App() {
         }
         isBackendConnected={isBackendConnected}
         statusMessage={statusMessage}
+        onOpenExtension={() => setIsExtensionModalOpen(true)}
+      />
+
+      {/* Browser Extension Modal */}
+      <ExtensionModal
+        isOpen={isExtensionModalOpen}
+        onClose={() => setIsExtensionModalOpen(false)}
+      />
+
+      {/* User Authentication Modal (Sign In & Sign Up) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode={authModalMode}
+      />
+
+      {/* User Profile & Security Settings Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
+      />
+
+      {/* Bolex Plus Perks Modal */}
+      <BolexPlusModal
+        isOpen={isBolexPlusModalOpen}
+        onClose={() => setIsBolexPlusModalOpen(false)}
       />
     </div>
   );

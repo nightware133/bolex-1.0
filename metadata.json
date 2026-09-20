@@ -1,6 +1,6 @@
 {
-  "name": "Smart AI Assistant",
-  "description": "A functional, responsive AI assistant powered by Gemini with search grounding, multimodal vision, role presets, and streaming responses.",
-  "requestFramePermissions": [],
+  "name": "Bolex AI Assistant",
+  "description": "Bolex AI is a responsive assistant with Web Speech microphone dictation, Bolex Plus membership perks, search grounding, multimodal vision, and role presets.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -66,7 +66,7 @@ export const MessageItem = memo(function MessageItem({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-neutral-300">
-                {isUser ? 'You' : 'Gemini 3.8'}
+                {isUser ? 'You' : 'Bolex'}
               </span>
               <span className="text-[11px] text-neutral-400">
                 {new Date(message.timestamp).toLocaleTimeString([], {

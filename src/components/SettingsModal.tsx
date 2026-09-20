@@ -7,7 +7,8 @@ import {
   Sliders, 
   FileCode, 
   ShieldCheck, 
-  ExternalLink 
+  ExternalLink,
+  Chrome
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -19,6 +20,7 @@ interface SettingsModalProps {
   onSaveCustomPrompt: (prompt: string) => void;
   isBackendConnected: boolean;
   statusMessage: string;
+  onOpenExtension?: () => void;
 }
 
 export function SettingsModal({
@@ -30,6 +32,7 @@ export function SettingsModal({
   onSaveCustomPrompt,
   isBackendConnected,
   statusMessage,
+  onOpenExtension,
 }: SettingsModalProps) {
   const [localTemp, setLocalTemp] = useState(temperature);
   const [localPrompt, setLocalPrompt] = useState(customSystemPrompt);
@@ -97,10 +100,10 @@ export function SettingsModal({
             </div>
 
             <p className="text-neutral-300 text-xs leading-relaxed">
-              <strong className="text-white font-medium">Does it need an API key?</strong> Yes, Gemini uses an API key to communicate with Google's servers.
+              <strong className="text-white font-medium">Does Bolex need an API key?</strong> Yes, Bolex uses an API key to communicate with the cloud intelligence engine.
             </p>
             <p className="text-neutral-300 text-xs leading-relaxed">
-              <strong className="text-white font-medium">Does an unpaid key work?</strong> <span className="text-emerald-300 font-medium">Yes, 100%!</span> This app uses <code className="px-1 py-0.5 bg-neutral-900 rounded text-amber-300 font-mono text-[11px]">gemini-3.8-flash</code>, which supports Google AI Studio's standard free tier. You do <em>not</em> need paid billing or a credit card.
+              <strong className="text-white font-medium">Does an unpaid key work?</strong> <span className="text-emerald-300 font-medium">Yes, 100%!</span> Bolex supports the standard free quota tier. You do <em>not</em> need paid billing or a credit card.
             </p>
 
             <div className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800/80 flex items-start gap-2.5 text-xs text-neutral-400">
@@ -139,21 +142,31 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* Custom System Instruction */}
-          <div className="space-y-2">
-            <label htmlFor="custom-instructions-input" className="text-xs font-semibold text-neutral-200 flex items-center justify-between">
-              <span>Custom System Prompt Override (Optional)</span>
-              <span className="text-[11px] font-normal text-neutral-400">Appends to active persona</span>
-            </label>
-            <textarea
-              id="custom-instructions-input"
-              rows={3}
-              value={localPrompt}
-              onChange={(e) => setLocalPrompt(e.target.value)}
-              placeholder="e.g., Always format responses with clean bullet points and provide code examples in TypeScript."
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-neutral-950 border border-neutral-800 rounded-xl text-neutral-100 placeholder-neutral-500 focus:outline-hidden focus:border-amber-500/60 leading-relaxed resize-none"
-            />
-          </div>
+          {/* Browser Extension Promo */}
+          {onOpenExtension && (
+            <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <Chrome className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-white">Browser Extension Package</div>
+                  <div className="text-[11px] text-neutral-400">Install Bolex directly in Chrome, Edge, or Brave</div>
+                </div>
+              </div>
+              <button
+                id="settings-open-extension-btn"
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenExtension();
+                }}
+                className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-750 text-amber-400 hover:text-amber-300 text-xs font-medium border border-neutral-700 transition-colors shrink-0"
+              >
+                Get Extension
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

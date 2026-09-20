@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bolex AI - Assistant</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- Top Navigation -->
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-text">
+            <span class="brand-title">Bolex</span>
+            <span class="brand-badge">Assistant</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="clearChatBtn" class="icon-btn" title="Clear conversation">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            </svg>
+          </button>
+          <a id="openFullAppBtn" class="icon-btn" target="_blank" href="https://ais-pre-cge2tjdimpisaqembh3jzh-693311015224.us-west2.run.app" title="Open Bolex Full Workspace">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+          </a>
+        </div>
+      </header>
+
+      <!-- Chat Messages Scroll Area -->
+      <div id="messagesContainer" class="messages-container">
+        <div class="message system-welcome">
+          <div class="welcome-header">
+            <strong>Bolex AI Active</strong>
+          </div>
+          <p>I am your browser-side AI assistant. How can I assist you with your current task?</p>
+          <div class="quick-chips">
+            <button class="chip" data-prompt="Analyze the key factors and provide a structured summary.">📊 Analysis</button>
+            <button class="chip" data-prompt="Help me review and debug this logic or code.">🔍 Debug Code</button>
+            <button class="chip" data-prompt="Help me draft a clear, professional summary.">✍️ Draft Summary</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <footer class="input-area">
+        <div class="input-wrapper">
+          <textarea
+            id="chatInput"
+            rows="1"
+            placeholder="Ask Bolex anything... (Shift+Enter for newline)"
+          ></textarea>
+          <button id="sendBtn" class="send-btn" title="Send message">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+        <div class="input-meta">
+          <span>Enter to send &bull; Shift+Enter for new line</span>
+          <span id="serverStatus" class="status-badge connected">Connected</span>
+        </div>
+      </footer>
+    </div>
+
+    <!-- External script, zero inline script to strictly follow MV3 CSP -->
+    <script src="popup.js"></script>
+  </body>
+</html>

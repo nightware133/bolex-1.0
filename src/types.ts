@@ -50,4 +50,18 @@ export interface ChatSession {
   customSystemPrompt?: string;
   enableSearch: boolean;
   temperature: number;
+  systemStateSummary?: string;
 }
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  bio?: string;
+  createdAt: string;
+  updatedAt: string;
+  isBolexPlus?: boolean;
+  planTier?: 'free' | 'plus';
+}
+

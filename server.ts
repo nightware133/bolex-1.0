@@ -32,6 +32,17 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Enable CORS for Chrome/Edge/Firefox extensions & direct origins
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   app.use(express.json({ limit: "25mb" }));
 
   // API Status & Health
@@ -40,10 +51,10 @@ async function startServer() {
     res.json({
       status: "ok",
       hasApiKey: hasKey,
-      model: "gemini-3.8-flash",
+      model: "bolex-turbo",
       freeTierCompatible: true,
       message: hasKey
-        ? "AI engine is active with Gemini 3.8 Flash (Free Tier Compatible)."
+        ? "Bolex engine is active and ready."
         : "No API key detected. Please add your key in AI Studio under Settings > Secrets.",
     });
   });

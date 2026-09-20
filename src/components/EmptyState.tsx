@@ -42,7 +42,7 @@ export function EmptyState({
           How can I help you today?
         </h2>
         <p className="text-xs sm:text-sm text-neutral-400 max-w-md mx-auto leading-relaxed">
-          Powered by <strong className="text-neutral-200">Gemini 3.8 Flash</strong>. Ask questions, analyze code or images, brainstorm concepts, or search the web in real time.
+          Powered by <strong className="text-neutral-200">Bolex AI</strong>. Ask questions, analyze code or images, brainstorm concepts, or search the web in real time.
         </p>
       </div>
 
