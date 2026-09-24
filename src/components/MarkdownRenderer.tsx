@@ -1,4 +1,4 @@
-import { useState, useMemo, memo } from 'react';
+import React, { useState, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Check, Copy } from 'lucide-react';
 
@@ -7,31 +7,16 @@ interface MarkdownRendererProps {
 }
 
 interface CodeBlockProps {
-  inline?: boolean;
-  className?: string;
-  children?: React.ReactNode;
+  language?: string;
+  codeText: string;
 }
 
-const CodeBlock = memo(function CodeBlock({ inline, className, children, ...props }: CodeBlockProps) {
+const CodeBlock = memo(function CodeBlock({ language, codeText }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
-  const match = /language-(\w+)/.exec(className || '');
-  const language = match ? match[1] : '';
-  const textContent = String(children).replace(/\n$/, '');
-
-  if (inline) {
-    return (
-      <code
-        className="px-1.5 py-0.5 rounded-md bg-neutral-800 text-amber-200 font-mono text-xs border border-neutral-700/60"
-        {...props}
-      >
-        {children}
-      </code>
-    );
-  }
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(textContent);
+      await navigator.clipboard.writeText(codeText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -40,15 +25,15 @@ const CodeBlock = memo(function CodeBlock({ inline, className, children, ...prop
   };
 
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-neutral-800 bg-neutral-950 font-mono text-xs">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-900 border-b border-neutral-800/80 text-neutral-400">
+    <div className="my-3 rounded-lg overflow-hidden border border-neutral-800 bg-neutral-950 font-mono text-xs not-prose">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-900 border-b border-neutral-800/80 text-neutral-400 select-none">
         <span className="text-[11px] font-medium tracking-wide uppercase">
           {language || 'code'}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer"
           title="Copy code"
         >
           {copied ? (
@@ -65,38 +50,84 @@ const CodeBlock = memo(function CodeBlock({ inline, className, children, ...prop
         </button>
       </div>
       <div className="p-3 overflow-x-auto text-neutral-200 leading-relaxed font-mono">
-        <pre>{children}</pre>
+        <pre className="p-0 m-0 bg-transparent border-0 font-mono text-xs">
+          <code>{codeText}</code>
+        </pre>
       </div>
     </div>
   );
 });
 
 const markdownComponents = {
-  code: CodeBlock as any,
-  p: ({ children }: any) => <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>,
-  ul: ({ children }: any) => <ul className="list-disc pl-5 my-2 space-y-1 text-neutral-200">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal pl-5 my-2 space-y-1 text-neutral-200">{children}</ol>,
-  li: ({ children }: any) => <li className="leading-relaxed">{children}</li>,
+  // Pass through pre wrapper to avoid <pre><div>...</div></pre> hydration error
+  pre: ({ children }: any) => <>{children}</>,
+
+  // Handle both inline code (`foo`) and fenced blocks (```js ...)
+  code: ({ node, className, children, ...props }: any) => {
+    const match = /language-(\w+)/.exec(className || '');
+    const textContent = String(children).replace(/\n$/, '');
+    const isMultiLine = textContent.includes('\n');
+    const isFencedBlock = !!match || isMultiLine;
+
+    if (!isFencedBlock) {
+      return (
+        <code
+          className="px-1.5 py-0.5 rounded-md bg-neutral-800 text-amber-200 font-mono text-xs border border-neutral-700/60"
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+
+    return (
+      <CodeBlock
+        language={match ? match[1] : ''}
+        codeText={textContent}
+      />
+    );
+  },
+
+  p: ({ children }: any) => (
+    <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>
+  ),
+
+  ul: ({ children }: any) => (
+    <ul className="list-disc pl-5 my-2 space-y-1 text-neutral-200">{children}</ul>
+  ),
+
+  ol: ({ children }: any) => (
+    <ol className="list-decimal pl-5 my-2 space-y-1 text-neutral-200">{children}</ol>
+  ),
+
+  li: ({ children }: any) => (
+    <li className="leading-relaxed">{children}</li>
+  ),
+
   h1: ({ children }: any) => (
     <h1 className="text-xl font-bold text-white mt-4 mb-2 pb-1 border-b border-neutral-800">
       {children}
     </h1>
   ),
+
   h2: ({ children }: any) => (
     <h2 className="text-lg font-semibold text-white mt-3 mb-1.5">
       {children}
     </h2>
   ),
+
   h3: ({ children }: any) => (
     <h3 className="text-base font-semibold text-neutral-100 mt-2.5 mb-1">
       {children}
     </h3>
   ),
+
   blockquote: ({ children }: any) => (
     <blockquote className="border-l-2 border-amber-500/60 pl-3 my-2 text-neutral-300 italic">
       {children}
     </blockquote>
   ),
+
   table: ({ children }: any) => (
     <div className="overflow-x-auto my-3">
       <table className="min-w-full text-left border-collapse border border-neutral-800 text-xs sm:text-sm">
@@ -104,17 +135,23 @@ const markdownComponents = {
       </table>
     </div>
   ),
-  thead: ({ children }: any) => <thead className="bg-neutral-850 border-b border-neutral-800">{children}</thead>,
+
+  thead: ({ children }: any) => (
+    <thead className="bg-neutral-850 border-b border-neutral-800">{children}</thead>
+  ),
+
   th: ({ children }: any) => (
     <th className="px-3 py-2 font-semibold text-neutral-300 border border-neutral-800">
       {children}
     </th>
   ),
+
   td: ({ children }: any) => (
     <td className="px-3 py-1.5 text-neutral-300 border border-neutral-800">
       {children}
     </td>
   ),
+
   a: ({ href, children }: any) => (
     <a
       href={href}

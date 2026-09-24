@@ -40,6 +40,14 @@ export interface PersonaRole {
   icon: string;
 }
 
+export interface ChatFolder {
+  id: string;
+  name: string;
+  color?: string;
+  createdAt: number;
+  isCollapsed?: boolean;
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -51,6 +59,51 @@ export interface ChatSession {
   enableSearch: boolean;
   temperature: number;
   systemStateSummary?: string;
+  summary?: string;
+  isSummaryLoading?: boolean;
+  isPinned?: boolean;
+  folderId?: string | null;
+  isDeleted?: boolean;
+  deletedAt?: number | null;
+}
+
+export interface SpeechSettings {
+  rate: number;
+  pitch: number;
+  voiceURI?: string;
+  autoNarrate: boolean;
+}
+
+export interface MapNode {
+  id: string;
+  label: string;
+  description?: string;
+  category: 'core' | 'code' | 'research' | 'action' | 'location' | 'creative';
+  x: number;
+  y: number;
+  parentId?: string;
+  lat?: number;
+  lng?: number;
+  placeName?: string;
+  expanded?: boolean;
+  color?: string;
+  notes?: string;
+  confidence?: number;
+}
+
+export interface MapLink {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  animated?: boolean;
+  style?: 'solid' | 'dashed' | 'curved';
+}
+
+export interface MapData {
+  nodes: MapNode[];
+  links: MapLink[];
+  viewMode: 'knowledge' | 'places';
 }
 
 export interface UserProfile {
@@ -62,6 +115,21 @@ export interface UserProfile {
   createdAt: string;
   updatedAt: string;
   isBolexPlus?: boolean;
-  planTier?: 'free' | 'plus';
+  isBolexUltra?: boolean;
+  isBolexQuantum?: boolean;
+  planTier?: 'free' | 'plus' | 'ultra' | 'quantum';
+  trialTier?: 'plus' | 'ultra' | 'quantum' | null;
+  trialStartedAt?: string | null;
+  trialExpiresAt?: string | null;
+}
+
+export interface PublicUserProfile {
+  uid: string;
+  displayName: string;
+  photoURL?: string;
+  bio?: string;
+  planTier?: 'free' | 'plus' | 'ultra' | 'quantum';
+  createdAt: string;
+  updatedAt: string;
 }
 

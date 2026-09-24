@@ -12,7 +12,8 @@ import {
   Clock, 
   Sparkles,
   Edit3,
-  Crown
+  Crown,
+  Flame
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,10 +21,11 @@ interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenBolexPlus?: () => void;
+  onOpenAuth?: () => void;
 }
 
-export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus }: UserProfileModalProps) {
-  const { user, profile, logout, updateProfileInfo } = useAuth();
+export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus, onOpenAuth }: UserProfileModalProps) {
+  const { user, profile, effectiveTier, isTrialActive, trialRemainingText, isLocalUser, logout, updateProfileInfo } = useAuth();
   
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -41,7 +43,10 @@ export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus }: UserProfi
     }
   }, [profile, user]);
 
-  if (!isOpen || !user) return null;
+  if (!isOpen) return null;
+
+  const currentEmail = user?.email || profile?.email || 'user@bolex.ai';
+  const currentDisplayName = profile?.displayName || user?.displayName || displayName || 'Bolex User';
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,13 +105,17 @@ export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus }: UserProfi
             </div>
             <div>
               <h2 className="text-base font-semibold text-white tracking-tight flex items-center gap-2">
-                <span>{profile?.displayName || user.displayName || 'User Profile'}</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  <ShieldCheck className="w-3 h-3" /> Authenticated
+                <span>{currentDisplayName}</span>
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium border ${
+                  isLocalUser
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                }`}>
+                  <ShieldCheck className="w-3 h-3" /> {isLocalUser ? 'Local Active Session' : 'Cloud Authenticated'}
                 </span>
               </h2>
               <p className="text-xs text-neutral-400 font-mono truncate max-w-[240px] sm:max-w-xs">
-                {user.email}
+                {currentEmail}
               </p>
             </div>
           </div>
@@ -122,27 +131,54 @@ export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus }: UserProfi
 
         {/* Content */}
         <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
-          {/* Bolex Plus Membership Card */}
-          <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-950/40 via-neutral-950 to-amber-950/20 border border-amber-500/30 flex items-center justify-between gap-3">
+          {/* Bolex Tier Membership Card */}
+          <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${
+            effectiveTier === 'quantum'
+              ? 'bg-gradient-to-r from-cyan-950/40 via-neutral-950 to-cyan-950/20 border-cyan-500/50'
+              : effectiveTier === 'ultra'
+              ? 'bg-gradient-to-r from-purple-950/40 via-neutral-950 to-purple-950/20 border-purple-500/40'
+              : effectiveTier === 'plus'
+              ? 'bg-gradient-to-r from-amber-950/40 via-neutral-950 to-amber-950/20 border-amber-500/30'
+              : 'bg-neutral-950/60 border-neutral-800'
+          }`}>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
-                <Crown className="w-5 h-5" />
+              <div className={`p-2 rounded-lg shrink-0 ${
+                effectiveTier === 'quantum'
+                  ? 'bg-cyan-500/10 text-cyan-400'
+                  : effectiveTier === 'ultra'
+                  ? 'bg-purple-500/10 text-purple-400'
+                  : 'bg-amber-500/10 text-amber-400'
+              }`}>
+                {effectiveTier === 'quantum' ? <Sparkles className="w-5 h-5 text-cyan-400 animate-spin" /> : effectiveTier === 'ultra' ? <Flame className="w-5 h-5 fill-purple-400/20" /> : <Crown className="w-5 h-5" />}
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-white">Membership Plan</span>
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    profile?.isBolexPlus 
+                    effectiveTier === 'quantum'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : effectiveTier === 'ultra'
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                      : effectiveTier === 'plus' 
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
                       : 'bg-neutral-800 text-neutral-400'
                   }`}>
-                    {profile?.isBolexPlus ? 'Bolex Plus' : 'Free Tier'}
+                    {effectiveTier === 'quantum' ? 'Bolex Quantum' : effectiveTier === 'ultra' ? 'Bolex Ultra VIP' : effectiveTier === 'plus' ? 'Bolex Plus' : 'Free Tier'}
                   </span>
+                  {isTrialActive && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      3-Day Trial: {trialRemainingText}
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-0.5">
-                  {profile?.isBolexPlus 
-                    ? 'Continuous voice dictation, priority turbo reasoning, & gold badge active.'
-                    : 'Upgrade to Bolex Plus for unlimited voice dictation and turbo responses.'}
+                  {effectiveTier === 'quantum'
+                    ? 'Consensus AI synthesis across 3 elite models, unlimited persistent memory, priority neural compute.'
+                    : effectiveTier === 'ultra'
+                    ? 'Unlimited infinite questions, 1M extended context, VIP zero-latency lane, and cognitive reasoning.'
+                    : effectiveTier === 'plus' 
+                    ? 'Unlimited infinite questions, continuous voice dictation, and neural audio studio active.'
+                    : '60 free questions per chat. Start a 3-Day Free Trial of Plus, Ultra, or Quantum for unlimited questions.'}
                 </p>
               </div>
             </div>
@@ -155,9 +191,13 @@ export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus }: UserProfi
                   onClose();
                   onOpenBolexPlus();
                 }}
-                className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold transition-colors shrink-0"
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors shrink-0 ${
+                  effectiveTier === 'ultra'
+                    ? 'bg-purple-500/15 hover:bg-purple-500/25 border-purple-500/30 text-purple-300'
+                    : 'bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/30 text-amber-300'
+                }`}
               >
-                {profile?.isBolexPlus ? 'View Perks' : 'Upgrade'}
+                {effectiveTier === 'free' ? '3-Day Trial' : 'Manage Tier'}
               </button>
             )}
           </div>
@@ -239,15 +279,32 @@ export function UserProfileModal({ isOpen, onClose, onOpenBolexPlus }: UserProfi
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <button
-                id="profile-logout-btn"
-                type="button"
-                onClick={handleLogout}
-                className="py-2 px-3 rounded-xl border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800 text-neutral-400 hover:text-rose-400 text-xs font-medium flex items-center gap-1.5 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Log out</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  id="profile-logout-btn"
+                  type="button"
+                  onClick={handleLogout}
+                  className="py-2 px-3 rounded-xl border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800 text-neutral-400 hover:text-rose-400 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Log out</span>
+                </button>
+
+                {onOpenAuth && (
+                  <button
+                    id="profile-switch-account-btn"
+                    type="button"
+                    onClick={async () => {
+                      await handleLogout();
+                      onOpenAuth();
+                    }}
+                    className="py-2 px-3 rounded-xl border border-neutral-800 hover:border-neutral-700 hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Switch Account</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 id="profile-save-btn"

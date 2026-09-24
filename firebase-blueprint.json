@@ -45,19 +45,89 @@
           "type": "boolean",
           "description": "Whether the user holds an active Bolex Plus subscription tier."
         },
+        "isBolexUltra": {
+          "type": "boolean",
+          "description": "Whether the user holds an active Bolex Ultra subscription tier."
+        },
+        "isBolexQuantum": {
+          "type": "boolean",
+          "description": "Whether the user holds an active Bolex Quantum subscription tier."
+        },
         "planTier": {
           "type": "string",
-          "enum": ["free", "plus"],
-          "description": "The current subscription tier (free or plus)."
+          "enum": ["free", "plus", "ultra", "quantum"],
+          "description": "The current subscription tier (free, plus, ultra, or quantum)."
+        },
+        "trialTier": {
+          "type": "string",
+          "enum": ["plus", "ultra", "quantum"],
+          "description": "Active 3-day trial tier."
+        },
+        "trialStartedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp when the 3-day trial was started."
+        },
+        "trialExpiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp when the 3-day trial expires."
         }
       },
       "required": ["uid", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "publicProfile": {
+      "title": "Public Profile",
+      "description": "Public directory profile for searching real human accounts in Bolex without exposing private PII.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique Auth UID matching the document ID.",
+          "maxLength": 128
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The account's public display name.",
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "URL to the account's avatar image.",
+          "maxLength": 1024
+        },
+        "bio": {
+          "type": "string",
+          "description": "Public bio or personalization description.",
+          "maxLength": 500
+        },
+        "planTier": {
+          "type": "string",
+          "enum": ["free", "plus", "ultra", "quantum"],
+          "description": "The user's subscription tier."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp when the user account joined Bolex."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp when the account profile was last updated."
+        }
+      },
+      "required": ["uid", "displayName", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "userProfile",
       "description": "Stores private user account information. Only readable and writable by the user whose UID matches the document ID."
+    },
+    "/publicProfiles/{userId}": {
+      "schema": "publicProfile",
+      "description": "Stores publicly searchable user accounts in Bolex. No bots or fake accounts. Readable by signed-in users, writable only by the authenticated account owner."
     }
   }
 }

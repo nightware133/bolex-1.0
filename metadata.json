@@ -1,6 +1,6 @@
 {
   "name": "Bolex AI Assistant",
-  "description": "Bolex AI is a responsive assistant with Web Speech microphone dictation, Bolex Plus membership perks, search grounding, multimodal vision, and role presets.",
+  "description": "Bolex AI is a responsive assistant with Web Speech read-aloud audio narration, microphone dictation, Bolex Plus membership perks, search grounding, multimodal vision, and role presets.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

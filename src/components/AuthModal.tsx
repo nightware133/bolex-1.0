@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Mail, 
@@ -8,8 +8,9 @@ import {
   ArrowRight, 
   AlertCircle, 
   Loader2, 
-  CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  UserCheck,
+  LogIn
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,7 +21,14 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModalProps) {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, authError, clearAuthError } = useAuth();
+  const { 
+    signInWithGoogle, 
+    signInWithEmail, 
+    signUpWithEmail, 
+    signInLocally, 
+    authError, 
+    clearAuthError 
+  } = useAuth();
   
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
@@ -29,6 +37,15 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Sync mode with initialMode when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setFormError(null);
+      clearAuthError();
+    }
+  }, [isOpen, initialMode]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +53,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
     setFormError(null);
     clearAuthError();
 
-    if (!email.trim() || !email.includes('@')) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
       setFormError('Please enter a valid email address.');
       return;
     }
@@ -49,14 +67,29 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
     setIsSubmitting(true);
     try {
       if (mode === 'signup') {
-        await signUpWithEmail(email, password, displayName);
+        await signUpWithEmail(cleanEmail, password, displayName.trim());
       } else {
-        await signInWithEmail(email, password);
+        await signInWithEmail(cleanEmail, password);
       }
       onClose();
     } catch (err: unknown) {
       const error = err as { message?: string };
-      setFormError(error?.message || 'Authentication failed. Please try again.');
+      setFormError(error?.message || 'Authentication failed. Please verify your details.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGuestSignIn = async () => {
+    setFormError(null);
+    clearAuthError();
+    setIsSubmitting(true);
+    try {
+      await signInLocally('guest@bolex.ai', 'Guest User');
+      onClose();
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setFormError(error?.message || 'Guest sign-in failed.');
     } finally {
       setIsSubmitting(false);
     }
@@ -79,20 +112,24 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
     }
   };
 
-  const toggleMode = () => {
-    setMode(prev => prev === 'signin' ? 'signup' : 'signin');
-    setFormError(null);
-    clearAuthError();
-  };
+  const isSwitchToSignUpSuggested = formError && (
+    formError.includes('switch to "Create Account"') || 
+    formError.includes('not have an account')
+  );
+
+  const isSwitchToSignInSuggested = formError && (
+    formError.includes('already exists') || 
+    formError.includes('switch to "Sign In"')
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-950/80 backdrop-blur-sm animate-in fade-in duration-150">
       <div 
-        className="w-full max-w-md rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl overflow-hidden flex flex-col"
+        className="w-full max-w-md rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-neutral-800 flex items-center justify-between">
+        <div className="p-5 border-b border-neutral-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-neutral-950 font-bold shadow-sm shadow-amber-500/20">
               <Sparkles className="w-5 h-5" />
@@ -102,7 +139,9 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
                 {mode === 'signin' ? 'Sign in to Bolex AI' : 'Create your Bolex account'}
               </h2>
               <p className="text-xs text-neutral-400">
-                {mode === 'signin' ? 'Access your personalized AI workspace' : 'Store your profile and preferences securely'}
+                {mode === 'signin' 
+                  ? 'Access your saved chats, folders, and custom roles' 
+                  : 'Sync your profile, preferences, and unlimited history'}
               </p>
             </div>
           </div>
@@ -117,14 +156,52 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
         </div>
 
         {/* Content */}
-        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {/* Segmented Mode Selector */}
+          <div className="p-1 bg-neutral-950 rounded-xl border border-neutral-800 flex gap-1">
+            <button
+              id="auth-tab-signin"
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setFormError(null);
+                clearAuthError();
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'signin'
+                  ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+            <button
+              id="auth-tab-signup"
+              type="button"
+              onClick={() => {
+                setMode('signup');
+                setFormError(null);
+                clearAuthError();
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'signup'
+                  ? 'bg-amber-500 text-neutral-950 shadow-sm'
+                  : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Create Account</span>
+            </button>
+          </div>
+
           {/* Quick Google Sign In */}
           <button
             id="google-signin-btn"
             type="button"
             onClick={handleGoogleSignIn}
             disabled={isSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-medium text-sm flex items-center justify-center gap-3 transition-colors shadow-sm disabled:opacity-50"
+            className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-medium text-xs sm:text-sm flex items-center justify-center gap-3 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
           >
             <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path
@@ -149,17 +226,49 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
 
           <div className="flex items-center gap-3">
             <div className="h-px bg-neutral-800 flex-1" />
-            <span className="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">Or with email</span>
+            <span className="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">Or with Email</span>
             <div className="h-px bg-neutral-800 flex-1" />
           </div>
 
-          {/* Error notice */}
+          {/* Error notice & smart mode switch prompt */}
           {(formError || authError) && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-              <div className="leading-relaxed">
-                {formError || authError}
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2 animate-in fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <div className="leading-relaxed flex-1">
+                  {formError || authError}
+                </div>
               </div>
+
+              {isSwitchToSignUpSuggested && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signup');
+                    setFormError(null);
+                    clearAuthError();
+                  }}
+                  className="self-start px-2.5 py-1 rounded-md bg-amber-500 text-neutral-950 text-xs font-semibold flex items-center gap-1.5 transition-colors hover:bg-amber-400 cursor-pointer"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>Switch to Create Account</span>
+                </button>
+              )}
+
+              {isSwitchToSignInSuggested && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signin');
+                    setFormError(null);
+                    clearAuthError();
+                  }}
+                  className="self-start px-2.5 py-1 rounded-md bg-amber-500 text-neutral-950 text-xs font-semibold flex items-center gap-1.5 transition-colors hover:bg-amber-400 cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Switch to Sign In</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -167,8 +276,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {mode === 'signup' && (
               <div>
-                <label className="block text-xs font-medium text-neutral-300 mb-1.5">
-                  Display Name
+                <label className="block text-xs font-medium text-neutral-300 mb-1">
+                  Display Name <span className="text-neutral-500 font-normal">(Optional)</span>
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -177,15 +286,15 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Jane Doe"
-                    className="w-full pl-9 pr-3 py-2 bg-neutral-950/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500/80 transition-colors"
+                    placeholder="Alex Morgan"
+                    className="w-full pl-9 pr-3 py-2.5 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500/80 transition-colors"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
                 Email Address
               </label>
               <div className="relative">
@@ -197,13 +306,13 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
-                  className="w-full pl-9 pr-3 py-2 bg-neutral-950/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500/80 transition-colors"
+                  className="w-full pl-9 pr-3 py-2.5 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500/80 transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
                 Password
               </label>
               <div className="relative">
@@ -216,10 +325,10 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2 bg-neutral-950/80 border border-neutral-800 rounded-xl text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-amber-500/80 transition-colors"
+                  className="w-full pl-9 pr-3 py-2.5 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500/80 transition-colors"
                 />
               </div>
-              <span className="text-[11px] text-neutral-400 mt-1 block">
+              <span className="text-[10px] text-neutral-400 mt-1 block">
                 Must be at least 6 characters
               </span>
             </div>
@@ -228,55 +337,38 @@ export function AuthModal({ isOpen, onClose, initialMode = 'signin' }: AuthModal
               id="auth-submit-btn"
               type="submit"
               disabled={isSubmitting}
-              className="w-full mt-2 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50"
+              className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50 cursor-pointer mt-2"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Processing...</span>
+                  <span>{mode === 'signin' ? 'Signing in...' : 'Creating account...'}</span>
                 </>
               ) : (
                 <>
-                  <span>{mode === 'signin' ? 'Sign In' : 'Create Account'}</span>
+                  <span>{mode === 'signin' ? 'Sign In to Bolex' : 'Create Account'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Security Notice */}
-          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2.5 text-[11px] text-neutral-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Profile stored securely in Firebase Firestore with owner-only access rules.</span>
+          {/* Security footnote */}
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400 pt-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>Encrypted cloud authentication & Firestore security</span>
           </div>
 
-          {/* Switch Mode */}
-          <div className="text-center pt-2 text-xs text-neutral-400">
-            {mode === 'signin' ? (
-              <>
-                Don't have an account?{' '}
-                <button
-                  id="switch-to-signup-btn"
-                  type="button"
-                  onClick={toggleMode}
-                  className="text-amber-400 font-medium hover:underline hover:text-amber-300 ml-1"
-                >
-                  Sign up
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <button
-                  id="switch-to-signin-btn"
-                  type="button"
-                  onClick={toggleMode}
-                  className="text-amber-400 font-medium hover:underline hover:text-amber-300 ml-1"
-                >
-                  Sign in
-                </button>
-              </>
-            )}
+          {/* Guest fallback option */}
+          <div className="text-center pt-2 border-t border-neutral-800/60">
+            <button
+              type="button"
+              onClick={handleGuestSignIn}
+              disabled={isSubmitting}
+              className="text-[11px] text-neutral-400 hover:text-neutral-300 transition-colors hover:underline"
+            >
+              Continue as guest in offline mode
+            </button>
           </div>
         </div>
       </div>

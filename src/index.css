@@ -1,1 +1,157 @@
 @import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+:root.light, html.light {
+  color-scheme: light;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(160, 160, 160, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(160, 160, 160, 0.35);
+}
+
+/* Equalizer animations for speech playback */
+@keyframes equalizer-bar-1 {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+@keyframes equalizer-bar-2 {
+  0%, 100% { height: 14px; }
+  50% { height: 6px; }
+}
+
+@keyframes equalizer-bar-3 {
+  0%, 100% { height: 6px; }
+  50% { height: 18px; }
+}
+
+@keyframes equalizer-bar-4 {
+  0%, 100% { height: 12px; }
+  50% { height: 4px; }
+}
+
+.animate-eq-1 {
+  animation: equalizer-bar-1 0.8s ease-in-out infinite;
+}
+.animate-eq-2 {
+  animation: equalizer-bar-2 0.6s ease-in-out infinite;
+}
+.animate-eq-3 {
+  animation: equalizer-bar-3 0.9s ease-in-out infinite;
+}
+.animate-eq-4 {
+  animation: equalizer-bar-4 0.7s ease-in-out infinite;
+}
+
+/* Light Mode Overrides for pristine aesthetic and high legibility */
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-neutral-950 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-neutral-900 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-neutral-900\/95,
+html.light .bg-neutral-900\/90,
+html.light .bg-neutral-900\/80,
+html.light .bg-neutral-900\/70,
+html.light .bg-neutral-900\/60,
+html.light .bg-neutral-900\/40 {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+}
+
+html.light .bg-neutral-850 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-neutral-800,
+html.light .bg-neutral-800\/90,
+html.light .bg-neutral-800\/80,
+html.light .bg-neutral-800\/60 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .hover\:bg-neutral-800:hover,
+html.light .hover\:bg-neutral-850:hover,
+html.light .hover\:bg-neutral-900:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .border-neutral-800,
+html.light .border-neutral-800\/90,
+html.light .border-neutral-800\/80,
+html.light .border-neutral-800\/60,
+html.light .border-neutral-800\/40,
+html.light .border-neutral-700,
+html.light .border-neutral-700\/60,
+html.light .border-neutral-700\/50,
+html.light .border-neutral-700\/40 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .text-white,
+html.light .text-neutral-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-neutral-200,
+html.light .text-neutral-300 {
+  color: #334155 !important;
+}
+
+html.light .text-neutral-400 {
+  color: #64748b !important;
+}
+
+html.light .text-neutral-500 {
+  color: #94a3b8 !important;
+}
+
+html.light input,
+html.light textarea {
+  color: #0f172a !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Light mode modal & card depth */
+html.light .shadow-2xl {
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.9) !important;
+}
+
+html.light .backdrop-blur-sm,
+html.light .backdrop-blur-md {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+/* Keep code blocks crisp in light mode */
+html.light .not-prose pre {
+  color: #0f172a;
+}

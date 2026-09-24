@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   Settings2, 
@@ -11,10 +12,21 @@ import {
   Chrome,
   LogIn,
   Crown,
-  User as UserIcon
+  Volume2,
+  VolumeX,
+  Headphones,
+  Sun,
+  Moon,
+  Laptop,
+  HelpCircle,
+  Keyboard
 } from 'lucide-react';
 import { PersonaRole } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { speechManager } from '../lib/speechManager';
+import { TokenIndicator } from './TokenIndicator';
+import { Flame, Compass, Users } from 'lucide-react';
 
 interface HeaderProps {
   currentRole: PersonaRole;
@@ -22,6 +34,9 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenExtension: () => void;
   onOpenBolexPlus?: () => void;
+  onOpenMap: () => void;
+  onOpenPeopleSearch: () => void;
+  onOpenShortcuts?: () => void;
   onNewChat: () => void;
   onToggleSidebar: () => void;
   enableSearch: boolean;
@@ -32,6 +47,7 @@ interface HeaderProps {
   onOpenProfile: () => void;
   hasMessages: boolean;
   isBackendConnected: boolean;
+  sessionTokens?: number;
 }
 
 export function Header({
@@ -40,6 +56,9 @@ export function Header({
   onOpenSettings,
   onOpenExtension,
   onOpenBolexPlus,
+  onOpenMap,
+  onOpenPeopleSearch,
+  onOpenShortcuts,
   onNewChat,
   onToggleSidebar,
   enableSearch,
@@ -50,9 +69,19 @@ export function Header({
   onOpenProfile,
   hasMessages,
   isBackendConnected,
+  sessionTokens = 0,
 }: HeaderProps) {
-  const { user, profile } = useAuth();
-  const isPlus = Boolean(profile?.isBolexPlus || profile?.planTier === 'plus');
+  const { user, profile, effectiveTier, isTrialActive, trialRemainingText } = useAuth();
+  const { themeMode, resolvedTheme, toggleTheme } = useTheme();
+  const [speechState, setSpeechState] = useState(() => speechManager.getState());
+
+  useEffect(() => {
+    return speechManager.subscribe((st) => setSpeechState(st));
+  }, []);
+
+  const toggleAutoNarrate = () => {
+    speechManager.setAutoNarrate(!speechState.autoNarrate);
+  };
 
   return (
     <header className="h-14 border-b border-neutral-800 bg-neutral-900/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between shrink-0 z-10">
@@ -68,7 +97,7 @@ export function Header({
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-neutral-950 font-bold shadow-sm shadow-amber-500/20">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-purple-500 to-amber-300 flex items-center justify-center text-neutral-950 font-bold shadow-sm shadow-amber-500/20">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -76,7 +105,18 @@ export function Header({
               <span className="font-semibold text-sm sm:text-base text-white tracking-tight">
                 Bolex AI
               </span>
-              {isPlus ? (
+              {effectiveTier === 'ultra' ? (
+                <button
+                  id="header-ultra-badge"
+                  type="button"
+                  onClick={onOpenBolexPlus}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 transition-colors shadow-xs"
+                  title="Bolex Ultra VIP Active"
+                >
+                  <Flame className="w-3 h-3 text-purple-400 fill-purple-400/20" />
+                  <span>ULTRA</span>
+                </button>
+              ) : effectiveTier === 'plus' ? (
                 <button
                   id="header-plus-badge"
                   type="button"
@@ -88,9 +128,15 @@ export function Header({
                   <span>PLUS</span>
                 </button>
               ) : (
-                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-800 text-neutral-300 border border-neutral-700/60">
-                  Bolex Turbo
-                </span>
+                <button
+                  id="header-free-badge"
+                  type="button"
+                  onClick={onOpenBolexPlus}
+                  className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-neutral-800 text-neutral-300 border border-neutral-700/60 hover:text-amber-300 transition-colors"
+                  title="Free Plan (60 questions/chat) — Click to start 3-Day Free Trial"
+                >
+                  <span>Free (60 questions)</span>
+                </button>
               )}
               <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400">
                 {isBackendConnected ? (
@@ -103,7 +149,7 @@ export function Header({
                   </span>
                 )}
                 <span className="hidden md:inline text-[11px] font-normal text-neutral-400">
-                  {isBackendConnected ? 'Free Tier Ready' : 'Connecting'}
+                  {isBackendConnected ? 'Active' : 'Connecting'}
                 </span>
               </span>
             </div>
@@ -112,6 +158,16 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Token Counter Indicator in Header */}
+        <TokenIndicator
+          tokens={sessionTokens}
+          tier={effectiveTier}
+          isTrialActive={isTrialActive}
+          trialRemainingText={trialRemainingText}
+          onOpenUpgradeModal={onOpenBolexPlus || (() => {})}
+          variant="header"
+        />
+
         {/* Role Selector Trigger */}
         <button
           id="role-selector-btn"
@@ -121,7 +177,7 @@ export function Header({
           title="Change assistant persona"
         >
           <span className="text-amber-400 font-semibold">Role:</span>
-          <span className="max-w-[80px] sm:max-w-[120px] truncate">{currentRole.name}</span>
+          <span className="max-w-[70px] sm:max-w-[110px] truncate">{currentRole.name}</span>
         </button>
 
         {/* Web Search Grounding Toggle */}
@@ -138,6 +194,28 @@ export function Header({
         >
           <Globe className={`w-3.5 h-3.5 ${enableSearch ? 'text-blue-400' : 'text-neutral-500'}`} />
           <span className="hidden sm:inline">Search</span>
+        </button>
+
+        {/* Auto-Speech Narration Toggle */}
+        <button
+          id="header-auto-narrate-btn"
+          type="button"
+          onClick={toggleAutoNarrate}
+          className={`p-1.5 rounded-lg text-xs font-medium transition-colors border hidden sm:flex items-center gap-1 ${
+            speechState.autoNarrate
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
+              : 'bg-neutral-800/60 text-neutral-400 border-neutral-800 hover:text-neutral-200 hover:bg-neutral-800'
+          }`}
+          title={
+            speechState.autoNarrate
+              ? 'Auto-Speech is ON: Bolex automatically reads new answers aloud'
+              : 'Auto-Speech is OFF: Click to enable hands-free read-aloud'
+          }
+        >
+          <Headphones className="w-3.5 h-3.5" />
+          <span className="hidden md:inline text-[11px]">
+            {speechState.autoNarrate ? 'Audio ON' : 'Audio OFF'}
+          </span>
         </button>
 
         {/* New Chat Button */}
@@ -189,23 +267,89 @@ export function Header({
           <span className="hidden sm:inline">Extension</span>
         </button>
 
-        {/* Bolex Plus Perks Modal Trigger */}
+        {/* Bolex Map Studio Trigger */}
+        <button
+          id="header-map-studio-btn"
+          type="button"
+          onClick={onOpenMap}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 border border-neutral-700/50 hover:border-amber-500/50 transition-all cursor-pointer shadow-xs"
+          title="Open Bolex Map Studio (Mind Map & Geographic Explorer)"
+        >
+          <Compass className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden sm:inline">Map</span>
+        </button>
+
+        {/* Search People / Bolex Accounts Trigger */}
+        <button
+          id="header-search-people-btn"
+          type="button"
+          onClick={onOpenPeopleSearch}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-neutral-800/80 hover:bg-neutral-800 text-neutral-200 border border-neutral-700/50 hover:border-amber-500/50 transition-all cursor-pointer shadow-xs"
+          title="Search People (Bolex Accounts • Strictly No Bots)"
+        >
+          <Users className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden md:inline">People</span>
+        </button>
+
+        {/* Bolex Membership & Tiers Trigger */}
         {onOpenBolexPlus && (
           <button
             id="header-bolex-plus-btn"
             type="button"
             onClick={onOpenBolexPlus}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold transition-all shadow-xs ${
-              isPlus
+              effectiveTier === 'quantum'
+                ? 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/50 ring-1 ring-cyan-500/30'
+                : effectiveTier === 'ultra'
+                ? 'bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40'
+                : effectiveTier === 'plus'
                 ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40'
                 : 'bg-neutral-800/80 hover:bg-neutral-800 text-neutral-300 hover:text-amber-300 border border-neutral-700/50'
             }`}
-            title="Explore Bolex Plus member perks (Continuous Voice, Priority Turbo, Deep Reasoning)"
+            title="Explore Bolex Membership Tiers & 3-Day Free Trials"
           >
-            <Crown className={`w-3.5 h-3.5 ${isPlus ? 'text-amber-400' : 'text-amber-400/80'}`} />
-            <span className="hidden md:inline">{isPlus ? 'Plus Active' : 'Bolex Plus'}</span>
+            {effectiveTier === 'quantum' ? (
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+            ) : effectiveTier === 'ultra' ? (
+              <Flame className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />
+            ) : (
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span className="hidden md:inline">
+              {effectiveTier === 'quantum' ? 'Quantum VIP' : effectiveTier === 'ultra' ? 'Ultra VIP' : effectiveTier === 'plus' ? 'Plus Active' : '3-Day Trial'}
+            </span>
           </button>
         )}
+
+        {/* Keyboard Shortcuts '?' Helper Button */}
+        {onOpenShortcuts && (
+          <button
+            id="header-shortcuts-btn"
+            type="button"
+            onClick={onOpenShortcuts}
+            className="p-1.5 rounded-lg text-neutral-400 hover:text-amber-300 hover:bg-neutral-800 transition-colors flex items-center justify-center font-mono font-bold text-xs"
+            title="Keyboard Shortcuts Cheat Sheet (Press ? or ⌘/)"
+          >
+            <span className="w-4 h-4 rounded-full border border-neutral-600 hover:border-amber-400/80 flex items-center justify-center text-[11px] leading-none">
+              ?
+            </span>
+          </button>
+        )}
+
+        {/* Quick Theme Toggle Button */}
+        <button
+          id="header-theme-toggle-btn"
+          type="button"
+          onClick={toggleTheme}
+          className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+          title={`Theme: ${resolvedTheme === 'dark' ? 'Dark Theme' : 'Light Theme'} (${themeMode === 'system' ? 'Auto OS Match' : 'Manual'}). Click to switch.`}
+        >
+          {resolvedTheme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-purple-400" />
+          )}
+        </button>
 
         {/* Settings Button */}
         <button
@@ -213,7 +357,7 @@ export function Header({
           type="button"
           onClick={onOpenSettings}
           className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-          title="Intelligence settings & API key info"
+          title="Assistant settings, theme override & API info"
         >
           <Settings2 className="w-4 h-4" />
         </button>

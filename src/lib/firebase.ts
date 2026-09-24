@@ -15,10 +15,14 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
-  getDocFromServer 
+  getDocFromServer,
+  collection,
+  getDocs,
+  query,
+  limit
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { UserProfile } from '../types';
+import { UserProfile, PublicUserProfile } from '../types';
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
@@ -111,6 +115,52 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 }
 
 /**
+ * Synchronizes public searchable profile in publicProfiles collection
+ * Strictly real human accounts, zero bots, and zero email/PII leakage
+ */
+export async function syncPublicProfile(
+  uid: string,
+  data: {
+    displayName: string;
+    photoURL?: string;
+    bio?: string;
+    planTier?: 'free' | 'plus' | 'ultra' | 'quantum';
+    createdAt?: string;
+  }
+): Promise<void> {
+  if (!auth.currentUser || auth.currentUser.uid !== uid) return;
+  const path = `publicProfiles/${uid}`;
+  const now = new Date().toISOString();
+  try {
+    const publicDocRef = doc(db, 'publicProfiles', uid);
+    const existingSnap = await getDoc(publicDocRef);
+    if (existingSnap.exists()) {
+      const updates: Record<string, unknown> = {
+        displayName: data.displayName.slice(0, 100),
+        updatedAt: now,
+      };
+      if (data.photoURL !== undefined) updates.photoURL = data.photoURL.slice(0, 1024);
+      if (data.bio !== undefined) updates.bio = data.bio.slice(0, 500);
+      if (data.planTier !== undefined) updates.planTier = data.planTier;
+      await updateDoc(publicDocRef, updates);
+    } else {
+      const publicPayload: Record<string, unknown> = {
+        uid,
+        displayName: data.displayName.slice(0, 100),
+        createdAt: data.createdAt || now,
+        updatedAt: now,
+      };
+      if (data.photoURL) publicPayload.photoURL = data.photoURL.slice(0, 1024);
+      if (data.bio) publicPayload.bio = data.bio.slice(0, 500);
+      if (data.planTier) publicPayload.planTier = data.planTier;
+      await setDoc(publicDocRef, publicPayload);
+    }
+  } catch (error) {
+    console.warn('Public profile sync skipped:', error);
+  }
+}
+
+/**
  * Ensures a user profile exists in Firestore upon signup or initial login
  */
 export async function syncUserProfile(user: User, additionalInfo?: { displayName?: string; bio?: string }): Promise<UserProfile> {
@@ -132,7 +182,18 @@ export async function syncUserProfile(user: User, additionalInfo?: { displayName
       }
       
       await updateDoc(doc(db, 'users', user.uid), updates);
-      return { ...existing, ...updates };
+      const merged = { ...existing, ...updates };
+
+      // Also ensure public directory record is up to date (no email/PII)
+      await syncPublicProfile(user.uid, {
+        displayName: merged.displayName,
+        photoURL: merged.photoURL,
+        bio: merged.bio,
+        planTier: merged.planTier || 'free',
+        createdAt: merged.createdAt,
+      });
+
+      return merged;
     }
 
     // Create new profile adhering to schema & constraints
@@ -158,6 +219,16 @@ export async function syncUserProfile(user: User, additionalInfo?: { displayName
     if (newProfile.bio) docData.bio = newProfile.bio;
 
     await setDoc(doc(db, 'users', user.uid), docData);
+
+    // Sync to public directory for searching people in Bolex (zero bots, zero PII)
+    await syncPublicProfile(user.uid, {
+      displayName: newProfile.displayName,
+      photoURL: newProfile.photoURL,
+      bio: newProfile.bio,
+      planTier: 'free',
+      createdAt: newProfile.createdAt,
+    });
+
     return newProfile;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -175,7 +246,12 @@ export async function updateUserProfileData(
     bio?: string; 
     photoURL?: string; 
     isBolexPlus?: boolean; 
-    planTier?: 'free' | 'plus';
+    isBolexUltra?: boolean;
+    isBolexQuantum?: boolean;
+    planTier?: 'free' | 'plus' | 'ultra' | 'quantum';
+    trialTier?: 'plus' | 'ultra' | 'quantum' | null;
+    trialStartedAt?: string | null;
+    trialExpiresAt?: string | null;
   }
 ): Promise<void> {
   const path = `users/${uid}`;
@@ -197,11 +273,34 @@ export async function updateUserProfileData(
     if (updates.isBolexPlus !== undefined) {
       cleanedUpdates.isBolexPlus = Boolean(updates.isBolexPlus);
     }
+    if (updates.isBolexUltra !== undefined) {
+      cleanedUpdates.isBolexUltra = Boolean(updates.isBolexUltra);
+    }
+    if (updates.isBolexQuantum !== undefined) {
+      cleanedUpdates.isBolexQuantum = Boolean(updates.isBolexQuantum);
+    }
     if (updates.planTier !== undefined) {
       cleanedUpdates.planTier = updates.planTier;
     }
+    if (updates.trialTier !== undefined) {
+      cleanedUpdates.trialTier = updates.trialTier;
+    }
+    if (updates.trialStartedAt !== undefined) {
+      cleanedUpdates.trialStartedAt = updates.trialStartedAt;
+    }
+    if (updates.trialExpiresAt !== undefined) {
+      cleanedUpdates.trialExpiresAt = updates.trialExpiresAt;
+    }
 
     await updateDoc(doc(db, 'users', uid), cleanedUpdates);
+
+    // Also update public directory record if relevant fields changed
+    await syncPublicProfile(uid, {
+      displayName: (cleanedUpdates.displayName as string) || auth.currentUser?.displayName || 'Bolex User',
+      photoURL: (cleanedUpdates.photoURL as string) || auth.currentUser?.photoURL || undefined,
+      bio: cleanedUpdates.bio as string | undefined,
+      planTier: cleanedUpdates.planTier as 'free' | 'plus' | 'ultra' | 'quantum' | undefined,
+    });
 
     // Also update auth profile if displayName or photoURL changed
     if (auth.currentUser && (updates.displayName || updates.photoURL)) {
@@ -212,6 +311,41 @@ export async function updateUserProfileData(
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+/**
+ * Searches real registered human accounts in Bolex
+ * Strictly zero bots, strictly no private email leakage
+ */
+export async function searchPublicProfiles(searchQuery: string = ''): Promise<PublicUserProfile[]> {
+  const path = 'publicProfiles';
+  try {
+    const q = query(collection(db, 'publicProfiles'), limit(100));
+    const snapshot = await getDocs(q);
+    const profiles: PublicUserProfile[] = [];
+    snapshot.forEach((d) => {
+      const data = d.data() as PublicUserProfile;
+      if (data && data.uid && data.displayName) {
+        profiles.push(data);
+      }
+    });
+
+    const trimmed = searchQuery.trim().toLowerCase();
+    if (!trimmed) {
+      return profiles.sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+    }
+
+    return profiles
+      .filter((p) => {
+        const nameMatch = p.displayName?.toLowerCase().includes(trimmed);
+        const bioMatch = p.bio?.toLowerCase().includes(trimmed);
+        return nameMatch || bioMatch;
+      })
+      .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+    return [];
   }
 }
 

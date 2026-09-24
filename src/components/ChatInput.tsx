@@ -9,10 +9,16 @@ import {
   MicOff,
   Sparkles,
   Crown,
-  AlertCircle
+  AlertCircle,
+  Wand2,
+  CheckCircle2,
+  Copy,
+  Layers
 } from 'lucide-react';
 import { ImageAttachment } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { TokenIndicator } from './TokenIndicator';
+import { Flame } from 'lucide-react';
 
 interface ChatInputProps {
   onSendMessage: (text: string, image?: ImageAttachment) => void;
@@ -22,6 +28,8 @@ interface ChatInputProps {
   onToggleSearch: () => void;
   disabled?: boolean;
   onOpenBolexPlus?: () => void;
+  onOpenShortcuts?: () => void;
+  sessionTokens?: number;
 }
 
 export function ChatInput({
@@ -32,6 +40,8 @@ export function ChatInput({
   onToggleSearch,
   disabled,
   onOpenBolexPlus,
+  onOpenShortcuts,
+  sessionTokens = 0,
 }: ChatInputProps) {
   const [inputText, setInputText] = useState('');
   const [attachedImage, setAttachedImage] = useState<ImageAttachment | null>(null);
@@ -40,17 +50,26 @@ export function ChatInput({
   const [interimTranscript, setInterimTranscript] = useState('');
   const [speechError, setSpeechError] = useState<string | null>(null);
 
+  // Magic Prompt Enhancer State
+  const [isOptimizingPrompt, setIsOptimizingPrompt] = useState(false);
+  const [optimizedPreview, setOptimizedPreview] = useState<{
+    optimizedPrompt: string;
+    enhancements: string[];
+    estimatedQualityBoost?: string;
+  } | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef(false);
   const isContinuousRef = useRef(false);
 
-  const { profile } = useAuth();
-  const isPlus = Boolean(profile?.isBolexPlus || profile?.planTier === 'plus');
+  const { effectiveTier, isTrialActive, trialRemainingText } = useAuth();
+  const isPlusOrUltra = effectiveTier === 'plus' || effectiveTier === 'ultra' || effectiveTier === 'quantum';
+  const isLimitReached = effectiveTier === 'free' && !isTrialActive && sessionTokens >= 60;
 
   isListeningRef.current = isListening;
-  isContinuousRef.current = isPlus;
+  isContinuousRef.current = isPlusOrUltra;
 
   // Cleanup speech recognition on unmount
   useEffect(() => {
@@ -212,6 +231,56 @@ export function ChatInput({
     e.target.value = '';
   };
 
+  const handleOptimizePrompt = async () => {
+    const raw = inputText.trim() || 'Create a comprehensive, expert-level strategic blueprint with clear execution milestones and risk mitigations.';
+    setIsOptimizingPrompt(true);
+    try {
+      const res = await fetch('/api/prompt/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawPrompt: raw }),
+      });
+      const data = await res.json();
+      if (data.ok && data.data?.optimizedPrompt) {
+        setOptimizedPreview({
+          optimizedPrompt: data.data.optimizedPrompt,
+          enhancements: data.data.enhancements || ['Expert role formulation', 'Structured deliverables', 'Negative constraints'],
+          estimatedQualityBoost: data.data.estimatedQualityBoost || '+140%',
+        });
+      } else {
+        // Fallback local enhancer if offline
+        const localEnhanced = `Act as a senior domain expert and principal advisor.\n\n### Objective\n${raw}\n\n### Requirements & Deliverables\n1. Provide a step-by-step breakdown with actionable takeaways.\n2. Detail edge cases, trade-offs, and critical security/quality constraints.\n3. Include a clean example or summary diagram.\n\nDeliver the analysis in clear, polished Markdown format.`;
+        setOptimizedPreview({
+          optimizedPrompt: localEnhanced,
+          enhancements: ['Persona & context framing', 'Structured deliverables schema', 'Edge case & quality guardrails'],
+          estimatedQualityBoost: '+120%',
+        });
+      }
+    } catch {
+      const localEnhanced = `Act as a senior domain expert and principal advisor.\n\n### Objective\n${raw}\n\n### Requirements & Deliverables\n1. Provide a step-by-step breakdown with actionable takeaways.\n2. Detail edge cases, trade-offs, and critical security/quality constraints.\n3. Include a clean example or summary diagram.\n\nDeliver the analysis in clear, polished Markdown format.`;
+      setOptimizedPreview({
+        optimizedPrompt: localEnhanced,
+        enhancements: ['Persona & context framing', 'Structured deliverables schema', 'Edge case guardrails'],
+        estimatedQualityBoost: '+120%',
+      });
+    } finally {
+      setIsOptimizingPrompt(false);
+    }
+  };
+
+  const handleApplyOptimized = () => {
+    if (!optimizedPreview) return;
+    setInputText(optimizedPreview.optimizedPrompt);
+    setOptimizedPreview(null);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+        textareaRef.current.focus();
+      }
+    }, 0);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -259,6 +328,16 @@ export function ChatInput({
   return (
     <div className="p-3 sm:p-4 bg-neutral-900/80 border-t border-neutral-800 backdrop-blur-md">
       <div className="max-w-3xl mx-auto space-y-2">
+        {/* Token limit or warning banner */}
+        <TokenIndicator
+          tokens={sessionTokens}
+          tier={effectiveTier}
+          isTrialActive={isTrialActive}
+          trialRemainingText={trialRemainingText}
+          onOpenUpgradeModal={onOpenBolexPlus || (() => {})}
+          variant="banner"
+        />
+
         {/* Drag overlay state */}
         <div
           onDragOver={handleDragOver}
@@ -269,6 +348,8 @@ export function ChatInput({
               ? 'border-amber-400/80 bg-neutral-900/90 ring-2 ring-amber-400/30'
               : isListening
               ? 'border-rose-500/60 ring-1 ring-rose-500/30'
+              : isLimitReached
+              ? 'border-rose-700/70 focus-within:border-rose-500 ring-1 ring-rose-500/20'
               : 'border-neutral-800 focus-within:border-neutral-700 focus-within:ring-1 focus-within:ring-amber-500/20'
           }`}
         >
@@ -281,7 +362,7 @@ export function ChatInput({
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
                 </span>
                 <span className="font-semibold text-rose-200 shrink-0">
-                  {isPlus ? 'Bolex Plus Pro Dictation' : 'Listening with Web Speech...'}
+                  {effectiveTier === 'ultra' ? 'Bolex Ultra VIP Continuous Dictation' : effectiveTier === 'plus' ? 'Bolex Plus Pro Dictation' : 'Listening with Web Speech...'}
                 </span>
                 {interimTranscript && (
                   <span className="text-neutral-400 truncate italic max-w-[280px]">
@@ -338,6 +419,68 @@ export function ChatInput({
               <div className="text-xs text-neutral-400 truncate max-w-[200px]">
                 <p className="font-medium text-neutral-300 truncate">{attachedImage.name || 'Image'}</p>
                 <p className="text-[11px] text-emerald-400">Attached for vision reasoning</p>
+              </div>
+            </div>
+          )}
+
+          {/* AI Magic Prompt Preview Card */}
+          {optimizedPreview && (
+            <div className="m-2.5 p-3 rounded-xl bg-neutral-900/95 border border-amber-500/40 shadow-xl space-y-2 animate-in fade-in duration-200 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>Bolex Prompt Studio Enhanced</span>
+                  {optimizedPreview.estimatedQualityBoost && (
+                    <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono">
+                      {optimizedPreview.estimatedQualityBoost} precision
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOptimizedPreview(null)}
+                  className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  title="Close enhancer preview"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="max-h-36 overflow-y-auto p-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed select-text">
+                {optimizedPreview.optimizedPrompt}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {optimizedPreview.enhancements.map((enh, i) => (
+                    <span key={i} className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                      {enh}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(optimizedPreview.optimizedPrompt);
+                    }}
+                    className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-750 text-neutral-300 hover:text-white text-[11px] font-medium transition-colors flex items-center gap-1"
+                    title="Copy to clipboard"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copy</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyOptimized}
+                    className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    <span>Apply to Chat</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -433,15 +576,56 @@ export function ChatInput({
                 </span>
               </button>
 
-              {/* Bolex Plus Perks Badge / Upgrade trigger */}
+              {/* AI Magic Prompt Enhancer / Optimizer Button */}
+              <button
+                id="input-magic-prompt-btn"
+                type="button"
+                onClick={handleOptimizePrompt}
+                disabled={isOptimizingPrompt}
+                className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-xs border ${
+                  isOptimizingPrompt
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse'
+                    : 'text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10 border-amber-500/25 hover:border-amber-500/50'
+                }`}
+                title="Enhance & structure prompt with Bolex Prompt Studio AI"
+              >
+                <Wand2 className={`w-3.5 h-3.5 ${isOptimizingPrompt ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline text-[11px] font-semibold">
+                  {isOptimizingPrompt ? 'Optimizing...' : 'Magic Prompt'}
+                </span>
+              </button>
+
+              {/* Bolex Tier Perks Badge / Upgrade trigger */}
               {onOpenBolexPlus && (
-                isPlus ? (
+                effectiveTier === 'quantum' ? (
+                  <button
+                    id="input-bolex-quantum-active-btn"
+                    type="button"
+                    onClick={onOpenBolexPlus}
+                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 text-cyan-300 flex items-center gap-1 text-xs transition-colors shadow-xs"
+                    title="Bolex Quantum Infinity VIP: Consensus Reasoning & Unlimited Bandwidth"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                    <span className="hidden sm:inline text-[11px] font-semibold">Quantum VIP</span>
+                  </button>
+                ) : effectiveTier === 'ultra' ? (
+                  <button
+                    id="input-bolex-ultra-active-btn"
+                    type="button"
+                    onClick={onOpenBolexPlus}
+                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-purple-500/15 border border-purple-500/30 hover:bg-purple-500/25 text-purple-300 flex items-center gap-1 text-xs transition-colors"
+                    title="Bolex Ultra VIP: Unlimited Tokens & VIP Zero-Latency Lane"
+                  >
+                    <Flame className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />
+                    <span className="hidden sm:inline text-[11px] font-semibold">Ultra VIP</span>
+                  </button>
+                ) : effectiveTier === 'plus' ? (
                   <button
                     id="input-bolex-plus-active-btn"
                     type="button"
                     onClick={onOpenBolexPlus}
                     className="p-1 sm:px-2 sm:py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 flex items-center gap-1 text-xs transition-colors"
-                    title="Bolex Plus member perks active: Continuous Voice & Priority Turbo"
+                    title="Bolex Plus member perks active: Unlimited Tokens & Turbo"
                   >
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
                     <span className="hidden sm:inline text-[11px] font-semibold">Plus Active</span>
@@ -452,10 +636,10 @@ export function ChatInput({
                     type="button"
                     onClick={onOpenBolexPlus}
                     className="p-1 sm:px-2 sm:py-1 rounded-lg bg-neutral-900 hover:bg-amber-500/10 border border-neutral-800 hover:border-amber-500/30 text-neutral-400 hover:text-amber-300 flex items-center gap-1 text-xs transition-colors"
-                    title="View Bolex Plus perks: Continuous voice dictation, turbo inference, and deep reasoning"
+                    title="Start 3-Day Free Trial of Plus or Ultra: Infinite Tokens"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="hidden sm:inline text-[11px] font-medium">Bolex Plus</span>
+                    <span className="hidden sm:inline text-[11px] font-medium">3-Day Trial</span>
                   </button>
                 )
               )}
@@ -466,6 +650,19 @@ export function ChatInput({
                 Enter ↵ to send
               </span>
 
+              {onOpenShortcuts && (
+                <button
+                  id="chat-shortcuts-helper-btn"
+                  type="button"
+                  onClick={onOpenShortcuts}
+                  className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono text-neutral-400 hover:text-amber-300 hover:bg-neutral-800 transition-colors border border-transparent hover:border-neutral-700"
+                  title="View keyboard shortcuts cheat sheet (?)"
+                >
+                  <kbd className="font-bold">?</kbd>
+                  <span className="text-[9px]">shortcuts</span>
+                </button>
+              )}
+
               {isLoading ? (
                 <button
                   id="stop-generation-btn"
@@ -475,6 +672,18 @@ export function ChatInput({
                   title="Stop response"
                 >
                   <Square className="w-4 h-4 fill-current" />
+                </button>
+              ) : isLimitReached ? (
+                <button
+                  id="limit-reached-trial-btn"
+                  type="button"
+                  onClick={onOpenBolexPlus}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all flex items-center gap-1 shadow-md shadow-rose-900/30 cursor-pointer"
+                  title="Free 60 questions limit reached. Click to start a 3-Day Free Trial for unlimited questions."
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Unlock (3-Day Trial)</span>
+                  <span className="sm:hidden">Unlock</span>
                 </button>
               ) : (
                 <button
@@ -495,6 +704,16 @@ export function ChatInput({
             </div>
           </div>
         </div>
+
+        {/* Dedicated Chat Footer Token Usage Indicator */}
+        <TokenIndicator
+          tokens={sessionTokens}
+          tier={effectiveTier}
+          isTrialActive={isTrialActive}
+          trialRemainingText={trialRemainingText}
+          onOpenUpgradeModal={onOpenBolexPlus || (() => {})}
+          variant="footer"
+        />
       </div>
     </div>
   );

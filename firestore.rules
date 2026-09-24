@@ -8,6 +8,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Connection probe endpoint
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Security helper functions
     function isSignedIn() {
       return request.auth != null;
@@ -41,7 +47,28 @@ service cloud.firestore {
         (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1024)) &&
         (!('bio' in data) || (data.bio is string && data.bio.size() <= 500)) &&
         (!('isBolexPlus' in data) || data.isBolexPlus is bool) &&
-        (!('planTier' in data) || (data.planTier is string && (data.planTier == 'free' || data.planTier == 'plus'))) &&
+        (!('isBolexUltra' in data) || data.isBolexUltra is bool) &&
+        (!('isBolexQuantum' in data) || data.isBolexQuantum is bool) &&
+        (!('planTier' in data) || (data.planTier is string && (data.planTier == 'free' || data.planTier == 'plus' || data.planTier == 'ultra' || data.planTier == 'quantum'))) &&
+        (!('trialTier' in data) || (data.trialTier == null || (data.trialTier is string && (data.trialTier == 'plus' || data.trialTier == 'ultra' || data.trialTier == 'quantum')))) &&
+        (!('trialStartedAt' in data) || (data.trialStartedAt == null || (data.trialStartedAt is string && data.trialStartedAt.size() <= 40))) &&
+        (!('trialExpiresAt' in data) || (data.trialExpiresAt == null || (data.trialExpiresAt is string && data.trialExpiresAt.size() <= 40))) &&
+        data.createdAt is string &&
+        data.createdAt.size() <= 40 &&
+        data.updatedAt is string &&
+        data.updatedAt.size() <= 40;
+    }
+
+    function isValidPublicProfile(data, userId) {
+      return data.uid is string &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.uid.size() <= 128 &&
+        data.displayName is string &&
+        data.displayName.size() <= 100 &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1024)) &&
+        (!('bio' in data) || (data.bio is string && data.bio.size() <= 500)) &&
+        (!('planTier' in data) || (data.planTier is string && (data.planTier == 'free' || data.planTier == 'plus' || data.planTier == 'ultra' || data.planTier == 'quantum'))) &&
         data.createdAt is string &&
         data.createdAt.size() <= 40 &&
         data.updatedAt is string &&
@@ -56,7 +83,7 @@ service cloud.firestore {
       allow create: if isOwner(userId) &&
         isValidId(userId) &&
         incoming().keys().hasAll(['uid', 'email', 'displayName', 'createdAt', 'updatedAt']) &&
-        incoming().keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt', 'isBolexPlus', 'planTier']) &&
+        incoming().keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt', 'isBolexPlus', 'isBolexUltra', 'isBolexQuantum', 'planTier', 'trialTier', 'trialStartedAt', 'trialExpiresAt']) &&
         isValidUserProfile(incoming(), userId);
 
       allow update: if isOwner(userId) &&
@@ -64,7 +91,28 @@ service cloud.firestore {
         isValidUserProfile(incoming(), userId) &&
         incoming().uid == existing().uid &&
         incoming().createdAt == existing().createdAt &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'updatedAt', 'email', 'isBolexPlus', 'planTier']);
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'updatedAt', 'email', 'isBolexPlus', 'isBolexUltra', 'isBolexQuantum', 'planTier', 'trialTier', 'trialStartedAt', 'trialExpiresAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // Match block for publicProfiles collection (Searchable real accounts in Bolex, strictly zero bots)
+    match /publicProfiles/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        incoming().keys().hasAll(['uid', 'displayName', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['uid', 'displayName', 'photoURL', 'bio', 'planTier', 'createdAt', 'updatedAt']) &&
+        isValidPublicProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidPublicProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'planTier', 'updatedAt']);
 
       allow delete: if isOwner(userId) && isValidId(userId);
     }
