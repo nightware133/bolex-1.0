@@ -1,5 +1,7 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import JSZip from "jszip";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -63,8 +65,73 @@ async function startServer() {
     });
   });
 
+  // Dynamic Browser Extension ZIP packaging endpoint
+  app.get(["/bolex-extension.zip", "/api/extension/download"], async (req, res) => {
+    try {
+      const zip = new JSZip();
+      const extDir = path.join(process.cwd(), "public", "extension");
+
+      if (!fs.existsSync(extDir)) {
+        return res.status(404).json({ error: "Extension bundle not found" });
+      }
+
+      // Determine current host from request headers
+      const hostProtocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+      const hostName = req.headers["x-forwarded-host"] || req.headers.host || "localhost:3000";
+      const detectedHost = `${hostProtocol}://${hostName}`;
+
+      // Helper to recursively add files to zip
+      const addDirectoryToZip = (dirPath: string, zipFolder: JSZip) => {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dirPath, entry.name);
+          if (entry.isDirectory()) {
+            const subFolder = zipFolder.folder(entry.name);
+            if (subFolder) {
+              addDirectoryToZip(fullPath, subFolder);
+            }
+          } else if (entry.isFile()) {
+            if (entry.name === "popup.js") {
+              // Pre-inject the detected server host for frictionless out-of-the-box operation
+              let content = fs.readFileSync(fullPath, "utf-8");
+              if (detectedHost && !detectedHost.includes("localhost")) {
+                content = content.replace(
+                  /const DEFAULT_FALLBACK_HOST = ['"][^'"]+['"];/,
+                  `const DEFAULT_FALLBACK_HOST = '${detectedHost}';`
+                );
+              }
+              zipFolder.file(entry.name, content);
+            } else if (entry.name.endsWith(".png") || entry.name.endsWith(".jpg") || entry.name.endsWith(".ico")) {
+              const binary = fs.readFileSync(fullPath);
+              zipFolder.file(entry.name, binary);
+            } else {
+              const text = fs.readFileSync(fullPath, "utf-8");
+              zipFolder.file(entry.name, text);
+            }
+          }
+        }
+      };
+
+      addDirectoryToZip(extDir, zip);
+
+      const zipBuffer = await zip.generateAsync({
+        type: "nodebuffer",
+        compression: "DEFLATE",
+        compressionOptions: { level: 9 },
+      });
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", 'attachment; filename="bolex-extension.zip"');
+      res.setHeader("Cache-Control", "no-cache");
+      return res.send(zipBuffer);
+    } catch (err: any) {
+      console.error("Failed to generate extension zip:", err);
+      return res.status(500).json({ error: "Failed to generate extension zip", details: err?.message });
+    }
+  });
+
   // Cache last working model to skip unavailable models on subsequent requests
-  let lastWorkingModel = "gemini-3.8-flash";
+  let lastWorkingModel = "gemini-3.6-flash";
 
   // Chat Streaming Route
   app.post("/api/chat", async (req, res) => {
@@ -74,6 +141,7 @@ async function startServer() {
         systemInstruction,
         enableSearch,
         temperature = 0.7,
+        modelVersion = "bolex-4.0",
       } = req.body;
 
       if (!Array.isArray(messages) || messages.length === 0) {
@@ -82,36 +150,63 @@ async function startServer() {
 
       const ai = getGeminiClient();
 
-      // Format messages for @google/genai
-      const contents = messages.map((m: { role: string; content: string; image?: { mimeType: string; data: string } }) => {
+      // Format and sanitize messages for @google/genai SDK
+      const rawContents: { role: string; parts: any[] }[] = [];
+      for (const m of messages) {
+        if (!m || typeof m !== "object") continue;
         const parts: any[] = [];
 
-        if (m.image && m.image.data) {
+        if (m.image && m.image.data && typeof m.image.data === "string" && m.image.data.trim()) {
           parts.push({
             inlineData: {
               mimeType: m.image.mimeType || "image/png",
-              data: m.image.data,
+              data: m.image.data.replace(/^data:image\/[a-z]+;base64,/, ""),
             },
           });
         }
 
-        if (m.content) {
-          parts.push({ text: m.content });
+        if (typeof m.content === "string" && m.content.trim()) {
+          parts.push({ text: m.content.trim() });
         }
 
-        return {
-          role: m.role === "user" ? "user" : "model",
-          parts: parts.length > 0 ? parts : [{ text: "" }],
-        };
-      });
+        if (parts.length > 0) {
+          rawContents.push({
+            role: m.role === "user" ? "user" : "model",
+            parts,
+          });
+        }
+      }
+
+      // Merge consecutive messages with same role to adhere to Gemini alternating role contract
+      const contents: { role: string; parts: any[] }[] = [];
+      for (const item of rawContents) {
+        if (contents.length > 0 && contents[contents.length - 1].role === item.role) {
+          contents[contents.length - 1].parts.push(...item.parts);
+        } else {
+          contents.push(item);
+        }
+      }
+
+      // Ensure at least one valid user message exists
+      if (contents.length === 0) {
+        contents.push({ role: "user", parts: [{ text: "Hello" }] });
+      }
 
       // Prepare configuration
       const config: any = {
         temperature: Math.max(0, Math.min(2, Number(temperature) || 0.7)),
       };
 
+      if (modelVersion === "bolex-o1" || modelVersion === "o1") {
+        config.thinkingConfig = { thinkingBudget: 4096 };
+      }
+
+      const antiGreetingDirective = "ABSOLUTE MANDATORY SYSTEM RULE: NEVER start your response with 'Hello, I am Bolex', 'Hello! I'm Bolex', 'Hi, I am Bolex', 'I am Bolex', 'Greetings! I am Bolex', or any variation of introductory greeting. DO NOT introduce yourself or say hello under any circumstances unless the user explicitly asks 'who are you' or 'what is your name'. Jump DIRECTLY into answering the user request.";
+
       if (systemInstruction && typeof systemInstruction === "string" && systemInstruction.trim()) {
-        config.systemInstruction = systemInstruction.trim();
+        config.systemInstruction = `${antiGreetingDirective}\n\n${systemInstruction.trim()}`;
+      } else {
+        config.systemInstruction = antiGreetingDirective;
       }
 
       let searchNoticeNeeded = false;
@@ -129,14 +224,58 @@ async function startServer() {
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders?.();
 
-      // Verified active models ordered by throughput and intelligence
-      const candidateModels = [
-        lastWorkingModel,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-latest",
-      ].filter((val, idx, arr) => arr.indexOf(val) === idx);
+      // Send periodic keep-alive comments to prevent proxy / load balancer timeouts
+      const keepAliveTimer = setInterval(() => {
+        if (!res.writableEnded) {
+          res.write(": keep-alive\n\n");
+        }
+      }, 10000);
+
+      // Verified active models mapped to version selection
+      const now = Date.now();
+      let baseModels: string[] = [];
+
+      if (modelVersion === "bolex-4.0" || modelVersion === "4.0") {
+        baseModels = [
+          "gemini-2.5-flash",
+          "gemini-3.7-flash",
+          "gemini-2.5-pro",
+          "gemini-3.6-flash",
+          "gemini-2.0-flash",
+        ];
+      } else if (modelVersion === "bolex-2.0" || modelVersion === "2.0") {
+        baseModels = [
+          "gemini-2.5-flash-lite",
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
+        ];
+      } else if (modelVersion === "bolex-o1" || modelVersion === "o1") {
+        baseModels = [
+          "gemini-2.5-pro",
+          "gemini-3.7-flash",
+          "gemini-2.5-flash",
+        ];
+      } else {
+        // default: bolex-3.8 / bolex-turbo
+        baseModels = [
+          "gemini-2.5-flash",
+          "gemini-3.7-flash",
+          "gemini-3.6-flash",
+          "gemini-2.0-flash",
+        ];
+      }
+
+      let candidateModels = baseModels
+        .filter((m) => {
+          const cooldown = modelCooldowns.get(m) || 0;
+          return now >= cooldown;
+        })
+        .filter((val, idx, arr) => arr.indexOf(val) === idx);
+
+      if (candidateModels.length === 0) {
+        modelCooldowns.clear();
+        candidateModels = baseModels;
+      }
 
       let groundingMetadata: any = null;
       let streamedAny = false;
@@ -144,6 +283,7 @@ async function startServer() {
 
       let clientDisconnected = false;
       res.on("close", () => {
+        clearInterval(keepAliveTimer);
         if (!res.writableEnded) {
           clientDisconnected = true;
         }
@@ -155,10 +295,12 @@ async function startServer() {
           if (clientDisconnected) return false;
           if (streamedAny) return true;
 
-          const attemptController = new AbortController();
+          let attemptDone = false;
           const attemptTimeout = setTimeout(() => {
-            attemptController.abort();
-          }, 12000);
+            if (!attemptDone && !streamedAny) {
+              console.warn(`Model ${modelName} attempt timed out at 30s`);
+            }
+          }, 30000);
 
           try {
             // Attempt 1: Streaming
@@ -166,18 +308,27 @@ async function startServer() {
               const stream = await ai.models.generateContentStream({
                 model: modelName,
                 contents,
-                config: {
-                  ...activeConfig,
-                  abortSignal: attemptController.signal,
-                },
+                config: activeConfig,
               });
 
               for await (const chunk of stream) {
+                attemptDone = true;
                 clearTimeout(attemptTimeout);
                 if (clientDisconnected) break;
+
                 const text = chunk.text;
                 const metadata = chunk.candidates?.[0]?.groundingMetadata;
                 if (metadata) groundingMetadata = metadata;
+
+                // Handle safety / policy block finish reason
+                const finishReason = chunk.candidates?.[0]?.finishReason;
+                if (finishReason === "SAFETY" || finishReason === "BLOCKLIST") {
+                  const safetyMsg = "\n\n*[Response generation was stopped by safety policies. Please adjust prompt phrasing.]*";
+                  res.write(`event: chunk\ndata: ${JSON.stringify({ text: safetyMsg })}\n\n`);
+                  streamedAny = true;
+                  break;
+                }
+
                 if (text) {
                   if ((isSearchRetry || searchNoticeNeeded) && !streamedAny) {
                     const notice = "> *Note: Web Search Grounding is temporarily at capacity. Responding via direct intelligence:*\n\n";
@@ -189,6 +340,7 @@ async function startServer() {
                 }
               }
             } catch (streamErr: any) {
+              attemptDone = true;
               if (streamedAny) throw streamErr;
             }
 
@@ -197,11 +349,9 @@ async function startServer() {
               const directRes = await ai.models.generateContent({
                 model: modelName,
                 contents,
-                config: {
-                  ...activeConfig,
-                  abortSignal: attemptController.signal,
-                },
+                config: activeConfig,
               });
+              attemptDone = true;
               const text = directRes.text;
               const metadata = directRes.candidates?.[0]?.groundingMetadata;
               if (metadata) groundingMetadata = metadata;
@@ -243,14 +393,27 @@ async function startServer() {
               err?.status === 503 ||
               err?.code === 503;
 
+            // Extract dynamic retry delay if provided
+            let cooldownMs = 30_000;
+            const delayMatch = errMsg.match(/retry in ([0-9.]+)s/i) || errMsg.match(/retrydelay[":\s]+([0-9]+)s/i);
+            if (delayMatch && delayMatch[1]) {
+              cooldownMs = Math.ceil(parseFloat(delayMatch[1]) * 1000) + 1000;
+            }
+
+            if (isQuotaError) {
+              modelCooldowns.set(modelName, Date.now() + cooldownMs);
+            }
+
             // If Google Search tool quota exhausted, trigger fallback without search
             if (activeConfig.tools && (isQuotaError || is503HighDemand)) {
               if (isQuotaError) {
-                searchGroundingExhaustedUntil = Date.now() + 120_000;
+                searchGroundingExhaustedUntil = Date.now() + 60_000;
               }
               return false;
             }
 
+            // Brief pause before trying next candidate model
+            await new Promise((r) => setTimeout(r, 200));
             continue;
           }
         }
@@ -266,11 +429,21 @@ async function startServer() {
         success = await tryStreamWithConfig(configWithoutSearch, true);
       }
 
+      // If failed while thinkingConfig was enabled, retry without thinkingConfig
+      if (!success && !streamedAny && config.thinkingConfig) {
+        const configWithoutThinking = { ...config };
+        delete configWithoutThinking.thinkingConfig;
+        delete configWithoutThinking.tools;
+        success = await tryStreamWithConfig(configWithoutThinking, true);
+      }
+
+      clearInterval(keepAliveTimer);
+
       if (!streamedAny) {
         if (lastErr) {
           throw lastErr;
         }
-        throw new Error("The AI model is currently experiencing high demand. Please click 'Retry Response' to regenerate.");
+        throw new Error("The AI model is currently experiencing high demand. Automatic failovers were attempted. Please click 'Retry Response' to regenerate.");
       }
 
       // Send completion event with grounding metadata if available
@@ -387,11 +560,11 @@ ${conversationTranscript}`;
 
       const candidateModels = [
         lastWorkingModel,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-latest",
-      ].filter((val, idx, arr) => arr.indexOf(val) === idx);
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+      ].filter((m) => (modelCooldowns.get(m) || 0) <= Date.now())
+       .filter((val, idx, arr) => arr.indexOf(val) === idx);
 
       let summaryText = "";
       for (const model of candidateModels) {
@@ -482,11 +655,11 @@ Ensure 6 to 12 well-connected nodes with a central 'core' node, diverse categori
 
       const candidateModels = [
         lastWorkingModel,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-latest",
-      ].filter((val, idx, arr) => arr.indexOf(val) === idx);
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+      ].filter((m) => (modelCooldowns.get(m) || 0) <= Date.now())
+       .filter((val, idx, arr) => arr.indexOf(val) === idx);
 
       let rawText = "";
       for (const model of candidateModels) {
@@ -554,11 +727,11 @@ Return ONLY valid JSON matching this exact structure:
 
       const candidateModels = [
         lastWorkingModel,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-latest",
-      ].filter((val, idx, arr) => arr.indexOf(val) === idx);
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+      ].filter((m) => (modelCooldowns.get(m) || 0) <= Date.now())
+       .filter((val, idx, arr) => arr.indexOf(val) === idx);
 
       let rawText = "";
       for (const model of candidateModels) {
@@ -627,11 +800,11 @@ Return ONLY valid JSON in this exact structure:
 
       const candidateModels = [
         lastWorkingModel,
-        "gemini-3.8-flash",
-        "gemini-3.7-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-flash-latest",
-      ].filter((val, idx, arr) => arr.indexOf(val) === idx);
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-flash",
+      ].filter((m) => (modelCooldowns.get(m) || 0) <= Date.now())
+       .filter((val, idx, arr) => arr.indexOf(val) === idx);
 
       let rawText = "";
       for (const model of candidateModels) {

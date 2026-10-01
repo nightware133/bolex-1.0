@@ -61,6 +61,122 @@
   animation: equalizer-bar-4 0.7s ease-in-out infinite;
 }
 
+/* Staggered Message Entrance Animations */
+@keyframes messageFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-message-fade-in {
+  animation: messageFadeIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes subContentFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-subcontent-fade-in {
+  animation: subContentFadeIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+  will-change: transform, opacity;
+}
+
+/* Light Mode Warning Banner Slide-In Entrance */
+@keyframes bannerSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  60% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-banner-slide-down {
+  animation: bannerSlideDown 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-banner-slide-down {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Light Mode 'Use Dark Mode' Recommendation Glowing Pulse */
+@keyframes darkModeBannerPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 0 0 0 rgba(168, 85, 247, 0);
+    border-color: rgba(245, 158, 11, 0.45);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 14px 2px rgba(245, 158, 11, 0.42), 0 0 6px 1px rgba(168, 85, 247, 0.3);
+    border-color: rgba(245, 158, 11, 0.85);
+    transform: scale(1.025);
+  }
+}
+
+.animate-pulse-glow {
+  animation: darkModeBannerPulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  will-change: box-shadow, border-color, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-glow {
+    animation: none;
+    transform: none;
+    box-shadow: 0 0 8px 1px rgba(245, 158, 11, 0.35);
+  }
+}
+
+/* Quantum Pulse & Hologram Accents */
+@keyframes quantumPulse {
+  0%, 100% {
+    box-shadow: 0 0 16px -2px rgba(168, 85, 247, 0.35), 0 0 8px -1px rgba(6, 182, 212, 0.3);
+    border-color: rgba(168, 85, 247, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 28px 2px rgba(168, 85, 247, 0.5), 0 0 14px 2px rgba(6, 182, 212, 0.45);
+    border-color: rgba(6, 182, 212, 0.8);
+  }
+}
+
+.animate-quantum-glow {
+  animation: quantumPulse 3.5s ease-in-out infinite;
+}
+
+@keyframes quantumHoloShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.quantum-holo-gradient {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(6, 182, 212, 0.25) 50%, rgba(236, 72, 153, 0.2) 100%);
+  background-size: 200% 200%;
+  animation: quantumHoloShimmer 6s ease infinite;
+}
+
 /* Light Mode Overrides for pristine aesthetic and high legibility */
 html.light body {
   background-color: #f8fafc !important;

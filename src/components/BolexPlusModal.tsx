@@ -29,10 +29,11 @@ import { speechManager } from '../lib/speechManager';
 interface BolexPlusModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultTierTab?: 'plus' | 'ultra';
+  defaultTierTab?: 'plus' | 'ultra' | 'quantum';
+  onOpenCheckout?: (tier: PlanTier) => void;
 }
 
-export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
+export function BolexPlusModal({ isOpen, onClose, onOpenCheckout }: BolexPlusModalProps) {
   const { user, profile, effectiveTier, isTrialActive, trialRemainingText, startTrial, cancelTrial, setPlanTier } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isPlayingDemo, setIsPlayingDemo] = useState(false);
@@ -49,7 +50,7 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
 
   if (!isOpen) return null;
 
-  const handleStartTrial = async (tier: 'plus' | 'ultra') => {
+  const handleStartTrial = async (tier: 'plus' | 'ultra' | 'quantum') => {
     setIsUpdating(true);
     try {
       await startTrial(tier);
@@ -61,13 +62,21 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
   };
 
   const handleSelectPlan = async (tier: PlanTier) => {
-    setIsUpdating(true);
-    try {
-      await setPlanTier(tier);
-    } catch (err) {
-      console.error('Failed to update plan:', err);
-    } finally {
-      setIsUpdating(false);
+    if (tier === 'free') {
+      setIsUpdating(true);
+      try {
+        await setPlanTier('free');
+      } catch (err) {
+        console.error('Failed to update plan:', err);
+      } finally {
+        setIsUpdating(false);
+      }
+      return;
+    }
+
+    if (onOpenCheckout) {
+      onOpenCheckout(tier);
+      onClose();
     }
   };
 
@@ -113,6 +122,7 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
       free: '60 Questions / conversation',
       plus: 'Unlimited (∞)',
       ultra: 'Unlimited (∞) + 1M Memory',
+      quantum: 'Unlimited (∞) + 2M Quantum Matrix',
       highlight: true,
     },
     {
@@ -120,6 +130,7 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
       free: '—',
       plus: 'Included (1-Click)',
       ultra: 'Included (1-Click)',
+      quantum: 'Included (1-Click)',
       highlight: true,
     },
     {
@@ -127,18 +138,21 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
       free: '1.0x Basic Speed',
       plus: '0.5x–2.5x Studio Pace',
       ultra: 'Neural HD + Continuous Pace',
+      quantum: 'Quantum Acoustic Synth (3.0x + Pitch Mod)',
     },
     {
       feature: 'Voice Microphone Dictation',
       free: 'Standard',
       plus: 'Continuous Hands-Free Pro',
       ultra: 'Continuous Pro + Acoustic Filter',
+      quantum: 'Quantum Real-Time Ambient DSP Dictation',
     },
     {
       feature: 'Inference Speed & Latency',
       free: 'Standard Queue',
       plus: 'Priority Turbo Speed',
       ultra: 'VIP Zero-Latency Ultra Lane',
+      quantum: 'Quantum Superlane Sub-MS Dispatch',
       highlight: true,
     },
     {
@@ -146,42 +160,56 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
       free: 'Standard Search',
       plus: 'Enhanced Web Grounding',
       ultra: 'Deep Web Research Pro',
+      quantum: 'Multi-Source Synthesis & Grounding Matrix',
     },
     {
       feature: 'Cognitive Deep Reasoning',
       free: 'Standard',
       plus: 'Advanced Reasoning',
       ultra: 'Chain-of-Thought Deep Reasoner',
+      quantum: 'Quantum Monte Carlo Hyper-Reasoning',
+      highlight: true,
+    },
+    {
+      feature: 'Contextual Memory Vault',
+      free: '3 Active Anchors',
+      plus: '15 Active Anchors',
+      ultra: 'Unlimited Anchors',
+      quantum: 'Unlimited + Auto-Cross-Synthesis Matrix',
     },
     {
       feature: 'Multimodal Vision & OCR',
       free: 'Basic Analysis',
       plus: 'High-Res Vision Processing',
       ultra: 'Unlimited Multimodal OCR Studio',
+      quantum: 'Batch Multi-Image Quantum OCR',
     },
     {
       feature: 'Conversation Pinning & Search',
       free: '—',
       plus: 'Unlimited Pinned Chats',
       ultra: 'Unlimited Pinned + Global Search',
+      quantum: 'Instant Neural Semantic Vault Search',
     },
     {
       feature: 'Document Export Suite',
       free: 'Markdown (.md)',
       plus: 'Markdown & JSON Backup',
       ultra: 'Markdown, JSON, Text, & PDF Layout',
+      quantum: 'Universal Export + Automated Executive Briefing',
     },
     {
       feature: 'VIP Profile Distinction',
       free: 'Standard Explorer',
       plus: 'Gold Plus Crown Badge',
       ultra: 'Radiant Titanium Ultra Badge',
+      quantum: 'Holographic Amethyst Quantum Apex Badge',
     },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-neutral-950/85 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-6xl rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="px-5 py-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/60">
           <div className="flex items-center gap-2.5">
@@ -245,8 +273,8 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
         <div className="p-5 overflow-y-auto space-y-6 text-sm flex-1">
           {activeTab === 'tiers' ? (
             <>
-              {/* 3 Tier Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* 4 Tier Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. FREE PLAN */}
                 <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
                   effectiveTier === 'free' && !isTrialActive
@@ -536,6 +564,141 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
                     )}
                   </div>
                 </div>
+
+                {/* 4. BOLEX QUANTUM (SUPREME APEX TIER) */}
+                <div className={`p-4 rounded-xl border flex flex-col justify-between relative transition-all overflow-hidden ${
+                  effectiveTier === 'quantum'
+                    ? 'bg-gradient-to-b from-purple-950/40 via-neutral-950 to-cyan-950/40 border-cyan-400 shadow-2xl ring-2 ring-cyan-500/50 animate-quantum-glow'
+                    : 'bg-gradient-to-b from-neutral-950/90 to-cyan-950/20 border-cyan-500/40 hover:border-cyan-400 hover:shadow-cyan-500/10 hover:shadow-xl'
+                }`}>
+                  {/* Hologram ribbon */}
+                  <div className="absolute -right-12 top-6 bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 text-neutral-950 font-black text-[9px] uppercase tracking-wider py-0.5 px-12 rotate-45 shadow-md">
+                    QUANTUM APEX
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400/20 animate-pulse" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400">
+                          Quantum VIP
+                        </span>
+                      </div>
+                      {effectiveTier === 'quantum' && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                          {isTrialActive ? '3-Day Trial' : 'Active Plan'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
+                        Bolex Quantum
+                      </h3>
+                      <div className="mt-1 flex items-baseline gap-1">
+                        <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300">
+                          $49
+                        </span>
+                        <span className="text-xs text-neutral-400">/ month</span>
+                      </div>
+                    </div>
+
+                    <div className="py-2 px-2.5 rounded-lg bg-cyan-950/40 border border-cyan-800/40 text-xs">
+                      <span className="text-neutral-300">Compute Matrix: </span>
+                      <strong className="text-cyan-300 font-mono font-bold">∞ Inf + 2M Context</strong>
+                    </div>
+
+                    <ul className="space-y-2 text-xs text-neutral-200">
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Infinite (∞) Tokens</strong> + 2M Matrix</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Quantum Hyper-Reasoning</strong> mode</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Quantum Superlane</strong> sub-ms bypass</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Multi-Anchor Synthesis</strong> up to 20</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Neural Acoustic Voice Studio</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Holographic Amethyst Badge</strong></span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-4 space-y-2">
+                    {effectiveTier === 'quantum' ? (
+                      <div className="space-y-1.5">
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full py-2 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold cursor-default text-center flex items-center justify-center gap-1.5"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>{isTrialActive ? `Trial Active: ${trialRemainingText}` : 'Active Quantum Apex'}</span>
+                        </button>
+                        {isTrialActive && (
+                          <button
+                            type="button"
+                            onClick={handleCancelTrial}
+                            disabled={isUpdating}
+                            className="w-full py-1 text-[11px] text-neutral-400 hover:text-rose-400 transition-colors"
+                          >
+                            Cancel 3-Day Trial
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <button
+                          id="start-quantum-trial-btn"
+                          type="button"
+                          onClick={() => handleStartTrial('quantum')}
+                          disabled={isUpdating}
+                          className="w-full py-2 rounded-lg bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 hover:opacity-95 text-neutral-950 text-xs font-bold transition-all shadow-md shadow-cyan-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Zap className="w-3.5 h-3.5 fill-current" />
+                          <span>{isUpdating ? 'Activating...' : 'Start 3-Day Free Trial (Quantum)'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectPlan('quantum')}
+                          disabled={isUpdating}
+                          className="w-full py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 text-cyan-300 border border-cyan-800/60 text-xs font-medium transition-colors"
+                        >
+                          Subscribe ($49/mo)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Redeem Gift Code Bar */}
+              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-850 flex items-center justify-between gap-3 text-xs">
+                <span className="text-neutral-400">Have a Founder Gift Code or won a giveaway?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenCheckout) {
+                      onOpenCheckout('ultra');
+                      onClose();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30 transition-colors"
+                >
+                  Redeem Code at Checkout &rarr;
+                </button>
               </div>
 
               {/* Interactive Speech Studio Preview */}
@@ -607,10 +770,11 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
                       <tr className="border-b border-neutral-800 bg-neutral-900/40">
-                        <th className="p-3 font-semibold text-neutral-300 w-1/3">Capability</th>
+                        <th className="p-3 font-semibold text-neutral-300 w-1/4">Capability</th>
                         <th className="p-3 font-semibold text-neutral-400 text-center">Free Plan</th>
-                        <th className="p-3 font-semibold text-amber-400 text-center">Bolex Plus</th>
-                        <th className="p-3 font-semibold text-purple-300 text-center bg-purple-950/10">Bolex Ultra (VIP)</th>
+                        <th className="p-3 font-semibold text-amber-400 text-center">Bolex Plus ($12)</th>
+                        <th className="p-3 font-semibold text-purple-300 text-center bg-purple-950/10">Bolex Ultra ($28)</th>
+                        <th className="p-3 font-semibold text-cyan-300 text-center bg-cyan-950/20 border-l border-cyan-800/30">Bolex Quantum ($49)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-800/60">
@@ -627,6 +791,9 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
                           <td className="p-3 text-purple-200 text-center font-semibold bg-purple-950/10">
                             {row.ultra}
                           </td>
+                          <td className="p-3 text-cyan-200 text-center font-bold bg-cyan-950/20 border-l border-cyan-800/30">
+                            {row.quantum}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -635,7 +802,7 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
               </div>
 
               {/* Quick Trial CTAs from matrix view */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => handleStartTrial('plus')}
@@ -644,7 +811,7 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
                 >
                   <div className="flex items-center gap-2">
                     <Crown className="w-4 h-4 text-amber-400" />
-                    <span>Try Bolex Plus Free for 3 Days</span>
+                    <span>Try Plus Free (3 Days)</span>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
@@ -657,7 +824,20 @@ export function BolexPlusModal({ isOpen, onClose }: BolexPlusModalProps) {
                 >
                   <div className="flex items-center gap-2">
                     <Flame className="w-4 h-4 text-purple-400" />
-                    <span>Try Bolex Ultra Free for 3 Days</span>
+                    <span>Try Ultra Free (3 Days)</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleStartTrial('quantum')}
+                  disabled={isUpdating}
+                  className="p-3 rounded-xl bg-cyan-950/30 hover:bg-cyan-950/50 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center justify-between shadow-xs shadow-cyan-500/10"
+                >
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400/20" />
+                    <span>Try Quantum Free (3 Days)</span>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>

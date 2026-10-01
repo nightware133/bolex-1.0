@@ -20,6 +20,22 @@ export interface ImageAttachment {
   name?: string;
 }
 
+export interface AIModelVersion {
+  id: string; // e.g. 'bolex-4.0', 'bolex-3.8', 'bolex-2.0', 'bolex-o1'
+  name: string; // e.g. 'Bolex 4.0 Omni'
+  versionNumber: string; // e.g. '4.0', '3.8', '2.0', 'o1'
+  tag: string; // e.g. 'Plus', 'Ultra', 'Free', 'Deep Reasoner'
+  tagColor: string;
+  description: string;
+  speed: string; // 'Instant', 'Ultra Fast', 'Balanced', 'Deep Thought'
+  intelligence: string; // '5/5', '4.5/5', '4/5', '5+/5'
+  contextLength: string;
+  icon: string;
+  highlight?: boolean;
+  requiredTier?: 'free' | 'plus' | 'ultra' | 'quantum';
+  isLockedForFree?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -29,6 +45,15 @@ export interface ChatMessage {
   isStreaming?: boolean;
   error?: string;
   grounding?: GroundingMetadata;
+  modelVersion?: string;
+  latencyMs?: number;
+  ttftMs?: number;
+  tokenMetrics?: {
+    prompt: number;
+    completion: number;
+    total: number;
+    tokensPerSecond?: number;
+  };
 }
 
 export interface PersonaRole {
@@ -48,6 +73,18 @@ export interface ChatFolder {
   isCollapsed?: boolean;
 }
 
+export interface ContextualAnchor {
+  id: string;
+  title: string;
+  category: 'architecture' | 'styleguide' | 'technical_doc' | 'system_rule' | 'custom';
+  keywords: string[];
+  content: string;
+  isEnabled: boolean;
+  isPinned?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ChatSession {
   id: string;
   title: string;
@@ -55,9 +92,12 @@ export interface ChatSession {
   updatedAt: number;
   messages: ChatMessage[];
   roleId: string;
+  modelVersion?: string;
   customSystemPrompt?: string;
   enableSearch: boolean;
   temperature: number;
+  enableCognitiveTrace?: boolean;
+  anchorsEnabled?: boolean;
   systemStateSummary?: string;
   summary?: string;
   isSummaryLoading?: boolean;
@@ -132,4 +172,35 @@ export interface PublicUserProfile {
   createdAt: string;
   updatedAt: string;
 }
+
+export type FeedbackCategory = 'accuracy' | 'code_quality' | 'speed' | 'formatting' | 'completeness' | 'general';
+
+export interface MessageFeedback {
+  id: string;
+  messageId: string;
+  sessionId: string;
+  sessionTitle: string;
+  model: string;
+  rating: number; // 1 to 5 integer
+  comment?: string;
+  category?: FeedbackCategory;
+  userPromptSnippet?: string;
+  assistantResponseSnippet?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface FeedbackStats {
+  totalCount: number;
+  averageRating: number;
+  distribution: {
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
+  };
+  positivePercentage: number;
+}
+
 

@@ -1,4 +1,66 @@
-import { PersonaRole } from './types';
+import { PersonaRole, AIModelVersion } from './types';
+
+export const AI_MODELS: AIModelVersion[] = [
+  {
+    id: 'bolex-4.0',
+    name: 'Bolex 4.0 Omni',
+    versionNumber: '4.0',
+    tag: 'Plus Tier',
+    tagColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    description: 'Our smartest & most versatile model. Elite reasoning, multimodal vision, nuanced writing, and complex coding.',
+    speed: 'Balanced',
+    intelligence: '5/5 (Elite)',
+    contextLength: '1M tokens',
+    icon: 'Sparkles',
+    highlight: true,
+    requiredTier: 'plus',
+    isLockedForFree: true,
+  },
+  {
+    id: 'bolex-o1',
+    name: 'Bolex o1 Deep Thinker',
+    versionNumber: 'o1',
+    tag: 'Ultra Tier',
+    tagColor: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    description: 'Specialized deep step-by-step reasoning architecture for hard math, logic puzzles, and system design.',
+    speed: 'Deep Thought',
+    intelligence: '5+/5 (Maximum)',
+    contextLength: '2M tokens',
+    icon: 'BrainCircuit',
+    requiredTier: 'ultra',
+    isLockedForFree: true,
+  },
+  {
+    id: 'bolex-3.8',
+    name: 'Bolex 3.8 Turbo',
+    versionNumber: '3.8',
+    tag: 'Free Default',
+    tagColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    description: 'Fast, dependable daily intelligence for code snippets, research synthesis, and rapid ideation.',
+    speed: 'Fast',
+    intelligence: '4.5/5',
+    contextLength: '1M tokens',
+    icon: 'Zap',
+    requiredTier: 'free',
+    isLockedForFree: false,
+  },
+  {
+    id: 'bolex-2.0',
+    name: 'Bolex 2.0 Flash',
+    versionNumber: '2.0',
+    tag: 'Free Flash',
+    tagColor: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+    description: 'Lightweight & instant responsiveness for quick questions, formatting, and low-latency workflows.',
+    speed: 'Instant',
+    intelligence: '4/5',
+    contextLength: '1M tokens',
+    icon: 'Flame',
+    requiredTier: 'free',
+    isLockedForFree: false,
+  },
+];
+
+export const DEFAULT_MODEL_VERSION = 'bolex-3.8';
 
 export const PERSONA_ROLES: PersonaRole[] = [
   {
@@ -7,7 +69,7 @@ export const PERSONA_ROLES: PersonaRole[] = [
     badge: 'Smart & Adaptive',
     description: 'Deeply knowledgeable, structured, thoughtful, and articulate on any topic.',
     systemPrompt:
-      'Your name is Bolex, an advanced, highly capable, and articulate AI assistant. When asked who you are or your name, identify yourself as Bolex. Provide insightful, direct, well-structured, and accurate answers. Format output with clean markdown, headers, bullet points, and code blocks where helpful.',
+      'You are Bolex, an advanced, highly capable, and articulate AI assistant. Answer the user prompt directly and immediately without repetitive greetings or saying "Hello, I am Bolex" on every response. Only mention your name if explicitly asked who you are. Provide insightful, direct, well-structured, and accurate answers. Format output with clean markdown, headers, bullet points, and code blocks where helpful.',
     icon: 'Sparkles',
   },
   {
@@ -16,7 +78,7 @@ export const PERSONA_ROLES: PersonaRole[] = [
     badge: 'Engineering & Debugging',
     description: 'Expert senior software engineer focused on production-grade code, debugging, and architecture.',
     systemPrompt:
-      'Your name is Bolex, an elite senior software engineer and architect. When asked who you are or your name, identify yourself as Bolex. Provide clean, robust, modern, and type-safe code with idiomatic best practices. Explain design trade-offs, edge cases, and performance implications clearly.',
+      'You are Bolex, an elite senior software engineer and architect. Jump straight into the solution without saying "Hello, I am Bolex" or repeating greetings. Provide clean, robust, modern, and type-safe code with idiomatic best practices. Explain design trade-offs, edge cases, and performance implications clearly.',
     icon: 'Terminal',
   },
   {
@@ -25,7 +87,7 @@ export const PERSONA_ROLES: PersonaRole[] = [
     badge: 'Deep Reasoning & Logic',
     description: 'Rigorous analytical thinker who breaks problems down into logical components and evidence.',
     systemPrompt:
-      'Your name is Bolex, an expert research analyst and critical thinker. When asked who you are or your name, identify yourself as Bolex. Break complex questions down systematically, compare alternatives, highlight caveats, and present evidence-based conclusions with precision.',
+      'You are Bolex, an expert research analyst and critical thinker. Answer directly without saying "Hello, I am Bolex" or repeating introductory greetings. Break complex questions down systematically, compare alternatives, highlight caveats, and present evidence-based conclusions with precision.',
     icon: 'Brain',
   },
   {
@@ -34,7 +96,7 @@ export const PERSONA_ROLES: PersonaRole[] = [
     badge: 'Zero Fluff',
     description: 'Maximum density answers with direct solutions, steps, and key facts.',
     systemPrompt:
-      'Your name is Bolex, a high-efficiency problem solver. When asked who you are or your name, identify yourself as Bolex. Provide concise, direct answers without unnecessary preamble, pleasantries, or filler. Use bullet points and straightforward instructions.',
+      'You are Bolex, a high-efficiency problem solver. Never say "Hello, I am Bolex" or include introductory pleasantries. Provide concise, direct answers immediately. Use bullet points and straightforward instructions.',
     icon: 'Zap',
   },
   {
@@ -43,7 +105,7 @@ export const PERSONA_ROLES: PersonaRole[] = [
     badge: 'Ideation & Writing',
     description: 'Creative thinker for compelling prose, brainstorming, narratives, and innovative concepts.',
     systemPrompt:
-      'Your name is Bolex, a brilliant creative strategist and writer. When asked who you are or your name, identify yourself as Bolex. Generate vivid, engaging, original ideas and polished prose. Adapt tone seamlessly and provide inspiring alternatives.',
+      'You are Bolex, a brilliant creative strategist and writer. Jump straight into creative output without repetitive greetings or saying "Hello, I am Bolex". Generate vivid, engaging, original ideas and polished prose. Adapt tone seamlessly and provide inspiring alternatives.',
     icon: 'PenTool',
   },
 ];

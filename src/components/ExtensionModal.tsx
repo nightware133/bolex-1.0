@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Chrome, 
   Download, 
@@ -8,9 +8,15 @@ import {
   FolderDown, 
   Layers, 
   Sparkles,
-  ExternalLink,
   Keyboard,
-  ShieldCheck
+  ShieldCheck,
+  Globe,
+  FileText,
+  Image as ImageIcon,
+  Code,
+  Activity,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 interface ExtensionModalProps {
@@ -21,6 +27,31 @@ interface ExtensionModalProps {
 export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
   const [copiedKey, setCopiedKey] = useState(false);
   const [activeTab, setActiveTab] = useState<'chrome' | 'edge' | 'manifest'>('chrome');
+  const [serverHealth, setServerHealth] = useState<{ status: string; hasKey: boolean } | null>(null);
+  const [isCheckingServer, setIsCheckingServer] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      checkHealth();
+    }
+  }, [isOpen]);
+
+  const checkHealth = async () => {
+    setIsCheckingServer(true);
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        setServerHealth({ status: 'online', hasKey: data.hasApiKey });
+      } else {
+        setServerHealth({ status: 'error', hasKey: false });
+      }
+    } catch {
+      setServerHealth({ status: 'offline', hasKey: false });
+    } finally {
+      setIsCheckingServer(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -41,13 +72,13 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-white">Bolex Browser Extension</h3>
+                <h3 className="text-base font-semibold text-white">Bolex Browser Extension v2.0</h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
-                  Chrome & Edge Ready
+                  Updated &amp; Feature-Complete
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400">
-                Use Bolex in any browser tab, sidebar, or quick popup
+                Web search, page summaries, vision analysis, and contextual side panel in any browser tab
               </p>
             </div>
           </div>
@@ -74,7 +105,7 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
             }`}
           >
             <Chrome className="w-3.5 h-3.5" />
-            <span>Google Chrome & Brave</span>
+            <span>Google Chrome &amp; Brave</span>
           </button>
           <button
             id="ext-tab-edge"
@@ -100,7 +131,7 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Manifest V3 Details</span>
+            <span>Manifest V3 Features</span>
           </button>
         </div>
 
@@ -114,18 +145,81 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
                 <span className="font-semibold text-white text-sm">Download Bolex Extension Package (.ZIP)</span>
               </div>
               <p className="text-xs text-neutral-300">
-                Ready-to-install Manifest V3 extension bundle with sidebar assistant and shortcut support.
+                Ready-to-install bundle pre-configured for your active workspace with Google Search Grounding &amp; Vision.
               </p>
             </div>
             <a
               id="download-extension-zip-btn"
               href="/bolex-extension.zip"
               download="bolex-extension.zip"
-              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs transition-all shadow-md flex items-center gap-2 shrink-0"
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs transition-all shadow-md flex items-center gap-2 shrink-0 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Download .ZIP</span>
             </a>
+          </div>
+
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] text-neutral-200 font-medium">Search Grounding</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] text-neutral-200 font-medium">1-Click Tab Summary</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2">
+              <ImageIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] text-neutral-200 font-medium">Vision &amp; Screenshots</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2">
+              <Code className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] text-neutral-200 font-medium">Syntax Highlighting</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2">
+              <Layers className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] text-neutral-200 font-medium">Chrome Side Panel</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-neutral-950/60 border border-neutral-800/80 flex items-center gap-2">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="text-[11px] text-neutral-200 font-medium">Right-Click Context</span>
+            </div>
+          </div>
+
+          {/* Backend Status Verification */}
+          <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2.5">
+              <Activity className="w-4 h-4 text-amber-400" />
+              <div>
+                <span className="font-medium text-white">Bolex Backend API Server</span>
+                <p className="text-[11px] text-neutral-400">
+                  {serverHealth?.status === 'online' 
+                    ? 'Engine online & ready for extension connections' 
+                    : isCheckingServer 
+                    ? 'Verifying server connection...' 
+                    : 'Server active on current instance'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {serverHealth?.status === 'online' ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Ready
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> Live
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={checkHealth}
+                className="text-[11px] text-neutral-400 hover:text-white px-2 py-0.5 rounded bg-neutral-900 border border-neutral-700"
+              >
+                Ping
+              </button>
+            </div>
           </div>
 
           {/* Installation Steps */}
@@ -142,7 +236,7 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
                 <div className="space-y-1">
                   <span className="font-medium text-white">Unzip the downloaded package</span>
                   <p className="text-neutral-400 text-[11px] leading-relaxed">
-                    Click the download button above, right-click the downloaded <code className="px-1 py-0.5 bg-neutral-900 rounded text-amber-300 font-mono text-[10px]">bolex-extension.zip</code>, and select <strong>"Extract All"</strong> (or double click on Mac).
+                    Click the download button above, right-click the downloaded <code className="px-1 py-0.5 bg-neutral-900 rounded text-amber-300 font-mono text-[10px]">bolex-extension.zip</code>, and select <strong>"Extract All"</strong> (or double-click on Mac).
                   </p>
                 </div>
               </div>
@@ -152,7 +246,7 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
                   2
                 </span>
                 <div className="space-y-1">
-                  <span className="font-medium text-white">Open your browser Extensions management page</span>
+                  <span className="font-medium text-white">Open your browser Extensions page</span>
                   <p className="text-neutral-400 text-[11px] leading-relaxed">
                     Navigate to{' '}
                     <code className="px-1.5 py-0.5 bg-neutral-900 border border-neutral-700 rounded text-amber-300 font-mono text-[11px]">
@@ -170,43 +264,32 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
                 <div className="space-y-1">
                   <span className="font-medium text-white">Click "Load unpacked"</span>
                   <p className="text-neutral-400 text-[11px] leading-relaxed">
-                    Click the <strong>"Load unpacked"</strong> button in your browser and select the extracted folder. Bolex will immediately appear in your browser toolbar!
+                    Click <strong>"Load unpacked"</strong> in your browser and select the unzipped folder. Bolex will immediately appear in your browser toolbar with shortcut <kbd className="px-1 py-0.5 bg-neutral-800 rounded font-mono text-amber-300 text-[10px]">Ctrl+Shift+B</kbd>!
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Quick Features / Shortcuts */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-            <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-start gap-2.5">
-              <Keyboard className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div className="text-xs space-y-1">
-                <div className="font-medium text-white flex items-center gap-1.5">
-                  <span>Quick Keyboard Shortcut</span>
-                  <button
-                    type="button"
-                    onClick={handleCopyShortcut}
-                    className="text-neutral-400 hover:text-white"
-                    title="Copy shortcut"
-                  >
-                    {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-neutral-400">
-                  Press <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Ctrl+Shift+B</kbd> (or <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Cmd+Shift+B</kbd>) from any website to invoke Bolex instantly.
-                </p>
+          {/* Quick Keyboard Shortcut */}
+          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-start gap-2.5">
+            <Keyboard className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1 flex-1">
+              <div className="font-medium text-white flex items-center justify-between">
+                <span>Instant Browser Shortcut</span>
+                <button
+                  type="button"
+                  onClick={handleCopyShortcut}
+                  className="text-neutral-400 hover:text-white flex items-center gap-1 text-[11px]"
+                  title="Copy shortcut"
+                >
+                  {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                </button>
               </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-start gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <div className="text-xs space-y-1">
-                <span className="font-medium text-white">Manifest V3 & Privacy Safe</span>
-                <p className="text-[11px] text-neutral-400">
-                  Uses modern Chrome SidePanel API. Runs directly in your browser with local session security.
-                </p>
-              </div>
+              <p className="text-[11px] text-neutral-400">
+                Press <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Ctrl+Shift+B</kbd> (or <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Cmd+Shift+B</kbd>) from any website or tab to trigger Bolex in popup or sidepanel mode.
+              </p>
             </div>
           </div>
         </div>
@@ -215,13 +298,13 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
         <div className="px-5 py-3 border-t border-neutral-800 bg-neutral-900/50 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-neutral-400">
             <Check className="w-3.5 h-3.5 text-amber-400" />
-            <span>Works alongside all your web browsing tabs</span>
+            <span>Compatible with Chrome, Edge, Brave, Arc &amp; Opera</span>
           </div>
           <button
             id="close-ext-done-btn"
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 transition-colors shadow-xs"
+            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 transition-colors shadow-xs cursor-pointer"
           >
             Got it
           </button>

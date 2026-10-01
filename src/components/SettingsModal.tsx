@@ -19,12 +19,19 @@ import {
   Sun,
   Moon,
   Laptop,
-  Monitor
+  Monitor,
+  AlertTriangle,
+  Lock,
+  BarChart3,
+  Star
 } from 'lucide-react';
 import { speechManager } from '../lib/speechManager';
 import { ChatSession } from '../types';
+import { AI_MODELS } from '../constants';
 import { TokenUsageAnalytics } from './TokenUsageAnalytics';
+import { FeedbackAnalyticsTab } from './FeedbackAnalyticsTab';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -39,6 +46,9 @@ interface SettingsModalProps {
   sessions?: ChatSession[];
   activeSessionId?: string;
   onSelectSession?: (id: string) => void;
+  selectedModelVersion?: string;
+  onSelectModelVersion?: (modelId: string) => void;
+  onOpenBolexPlus?: () => void;
 }
 
 export function SettingsModal({
@@ -54,9 +64,14 @@ export function SettingsModal({
   sessions = [],
   activeSessionId,
   onSelectSession,
+  selectedModelVersion = 'bolex-3.8',
+  onSelectModelVersion,
+  onOpenBolexPlus,
 }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'appearance' | 'analytics' | 'voice' | 'model'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'analytics' | 'feedback' | 'voice' | 'model'>('appearance');
   const [localTemp, setLocalTemp] = useState(temperature);
+  const { effectiveTier, isTrialActive } = useAuth();
+  const isFreeTier = effectiveTier === 'free' && !isTrialActive;
   const [localPrompt, setLocalPrompt] = useState(customSystemPrompt);
   const [speechState, setSpeechState] = useState(() => speechManager.getState());
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -172,9 +187,23 @@ export function SettingsModal({
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            <span>Token Usage &amp; History</span>
+            <span>Token Usage</span>
+          </button>
+
+          <button
+            id="tab-feedback-analytics-btn"
+            type="button"
+            onClick={() => setActiveTab('feedback')}
+            className={`pb-2.5 px-3 text-xs font-medium border-b-2 flex items-center gap-2 transition-all shrink-0 ${
+              activeTab === 'feedback'
+                ? 'border-amber-500 text-amber-300 font-semibold'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Feedback &amp; Quality</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-mono">
-              Recharts
+              CSV
             </span>
           </button>
 
@@ -225,7 +254,37 @@ export function SettingsModal({
 
                 {/* 3 Theme Options */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  {/* Option 1: Auto (System OS) */}
+                  {/* Option 1: Dark Theme (Recommended & Normal) */}
+                  <button
+                    id="theme-option-dark-btn"
+                    type="button"
+                    onClick={() => setThemeMode('dark')}
+                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-3 cursor-pointer ${
+                      themeMode === 'dark'
+                        ? 'bg-purple-500/15 border-purple-500/80 text-purple-300 ring-1 ring-purple-500/40 shadow-sm'
+                        : 'bg-neutral-900/90 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-850'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="p-2 rounded-lg bg-neutral-800 text-purple-400">
+                        <Moon className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        RECOMMENDED
+                      </span>
+                    </div>
+                    <div>
+                      <div className="font-bold text-xs text-white flex items-center gap-1">
+                        <span>Dark Theme</span>
+                        {themeMode === 'dark' && <span className="text-[10px] text-purple-400 font-normal">(Active)</span>}
+                      </div>
+                      <div className="text-[11px] text-neutral-400 mt-0.5 leading-snug">
+                        Deep obsidian contrast. Normal &amp; best for eyes.
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Auto (System OS) */}
                   <button
                     id="theme-option-system-btn"
                     type="button"
@@ -254,36 +313,7 @@ export function SettingsModal({
                     </div>
                   </button>
 
-                  {/* Option 2: Dark Theme */}
-                  <button
-                    id="theme-option-dark-btn"
-                    type="button"
-                    onClick={() => setThemeMode('dark')}
-                    className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-3 cursor-pointer ${
-                      themeMode === 'dark'
-                        ? 'bg-purple-500/15 border-purple-500/80 text-purple-300 ring-1 ring-purple-500/40 shadow-sm'
-                        : 'bg-neutral-900/90 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-850'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="p-2 rounded-lg bg-neutral-800 text-purple-400">
-                        <Moon className="w-4 h-4" />
-                      </div>
-                      {themeMode === 'dark' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-purple-500/25 text-purple-300 border border-purple-500/40">
-                          ACTIVE
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-bold text-xs text-white">Dark Theme</div>
-                      <div className="text-[11px] text-neutral-400 mt-0.5 leading-snug">
-                        Deep obsidian contrast
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Option 3: Light Theme */}
+                  {/* Option 3: Light Theme (Not Recommended) */}
                   <button
                     id="theme-option-light-btn"
                     type="button"
@@ -291,36 +321,61 @@ export function SettingsModal({
                     className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-3 cursor-pointer ${
                       themeMode === 'light'
                         ? 'bg-amber-500/15 border-amber-500/80 text-amber-300 ring-1 ring-amber-500/40 shadow-sm'
-                        : 'bg-neutral-900/90 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-850'
+                        : 'bg-neutral-900/90 border-neutral-800 text-neutral-300 hover:border-amber-500/40 hover:bg-neutral-850'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="p-2 rounded-lg bg-neutral-800 text-amber-400">
                         <Sun className="w-4 h-4" />
                       </div>
-                      {themeMode === 'light' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-500/25 text-amber-300 border border-amber-500/40">
-                          ACTIVE
-                        </span>
-                      )}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        <span>NOT RECOMMENDED</span>
+                      </span>
                     </div>
                     <div>
-                      <div className="font-bold text-xs text-white">Light Theme</div>
+                      <div className="font-bold text-xs text-white flex items-center gap-1">
+                        <span>Light Theme</span>
+                        {themeMode === 'light' && <span className="text-[10px] text-amber-400 font-normal">(Active)</span>}
+                      </div>
                       <div className="text-[11px] text-neutral-400 mt-0.5 leading-snug">
-                        Clean daylight contrast
+                        High glare; dark mode is normal.
                       </div>
                     </div>
                   </button>
                 </div>
 
+                {/* Light Mode Warning Alert Box */}
+                {resolvedTheme === 'light' && (
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                        <span>⚠️ Light Mode is Not Recommended</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                        Light mode can cause eye strain and doesn't match the application's dark obsidian color scheme. Dark mode is the normal, intended setting and is strongly recommended.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setThemeMode('dark')}
+                        className="mt-1 px-3 py-1 rounded-md bg-amber-500 text-neutral-950 font-bold text-[11px] hover:bg-amber-400 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Moon className="w-3.5 h-3.5" />
+                        <span>Switch back to Dark Mode (Recommended)</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Status & Live Preference Detection Banner */}
                 <div className="p-3 rounded-lg bg-neutral-900 border border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 text-neutral-200">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Active Theme: <strong className="text-white capitalize">{resolvedTheme} Mode</strong></span>
+                    <span>Active Theme: <strong className="text-white capitalize">{resolvedTheme} Mode</strong> {resolvedTheme === 'dark' ? '(Normal / Recommended)' : '(Not Recommended)'}</span>
                   </div>
                   <div className="text-[11px] text-neutral-400 font-mono">
-                    OS Preference Detected: <strong className="text-amber-300 capitalize">{systemPreference}</strong> ({themeMode === 'system' ? 'Synced' : 'Overridden'})
+                    OS Preference Detected: <strong className="text-amber-300 capitalize">{systemPreference}</strong> ({themeMode === 'system' ? 'Synced' : 'Manual'})
                   </div>
                 </div>
               </div>
@@ -341,9 +396,97 @@ export function SettingsModal({
             </div>
           )}
 
+          {/* TAB: FEEDBACK & QUALITY ANALYTICS */}
+          {activeTab === 'feedback' && (
+            <div className="space-y-4">
+              <FeedbackAnalyticsTab
+                sessions={sessions}
+                onSelectSession={(id) => {
+                  onSelectSession?.(id);
+                  onClose();
+                }}
+              />
+            </div>
+          )}
+
           {/* TAB 2: MODEL & SYSTEM PROMPT */}
           {activeTab === 'model' && (
             <div className="space-y-4">
+              {/* AI Model Version Selector */}
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-neutral-200 font-semibold text-xs sm:text-sm">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>Default AI Model Architecture</span>
+                  </div>
+                  <span className="text-[11px] text-amber-400 font-mono">
+                    {AI_MODELS.find(m => m.id === selectedModelVersion)?.name || 'Bolex 3.8 Turbo'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  Configure the default neural intelligence tier for new conversations. Bolex 4.0 Omni and Bolex o1 Deep Thinker are exclusive to Bolex Plus and Ultra members.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {AI_MODELS.map((model) => {
+                    const isLocked = Boolean(model.isLockedForFree && isFreeTier);
+                    const isSelected = selectedModelVersion === model.id || (!selectedModelVersion && model.id === 'bolex-3.8');
+
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => {
+                          if (isLocked) {
+                            onOpenBolexPlus?.();
+                            onClose();
+                            return;
+                          }
+                          onSelectModelVersion?.(model.id);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                          isSelected
+                            ? 'bg-neutral-900 border-amber-500/80 shadow-xs shadow-amber-500/10 ring-1 ring-amber-500/30'
+                            : isLocked
+                            ? 'bg-neutral-900/40 border-neutral-800/80 hover:border-amber-500/40 hover:bg-amber-950/10'
+                            : 'bg-neutral-900/60 border-neutral-800 hover:border-neutral-700 hover:bg-neutral-900'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                            <span>{model.name}</span>
+                            <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold border ${model.tagColor}`}>
+                              {model.versionNumber}
+                            </span>
+                            {isLocked && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center gap-0.5">
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>{model.requiredTier === 'ultra' ? 'ULTRA' : 'PLUS'}</span>
+                              </span>
+                            )}
+                          </div>
+                          {isLocked ? (
+                            <span className="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+                              <span>Upgrade</span>
+                            </span>
+                          ) : isSelected ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          ) : null}
+                        </div>
+                        <p className="text-[10.5px] text-neutral-400 leading-snug line-clamp-2">
+                          {model.description}
+                        </p>
+                        <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-1 border-t border-neutral-800/80">
+                          <span>⚡ {model.speed}</span>
+                          <span>🧠 {model.intelligence}</span>
+                          <span>📚 {model.contextLength}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Unpaid / Free API Key Guide Banner */}
               <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
                 <div className="flex items-center justify-between">

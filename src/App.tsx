@@ -13,13 +13,33 @@ import { BolexPlusModal } from './components/BolexPlusModal';
 import { MapStudioModal } from './components/MapStudioModal';
 import { PeopleSearchModal } from './components/PeopleSearchModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
-import { PERSONA_ROLES } from './constants';
-import { ChatMessage, ChatSession, ImageAttachment, PersonaRole, ChatFolder, PublicUserProfile } from './types';
-import { useAuth } from './context/AuthContext';
+import { ContextualAnchorsModal } from './components/ContextualAnchorsModal';
+import { CheckoutModal } from './components/CheckoutModal';
+import { FounderAdminModal } from './components/FounderAdminModal';
+import { GiveawayModal } from './components/GiveawayModal';
+import { GlobalAnnouncementBanner } from './components/GlobalAnnouncementBanner';
+import { ShareModal } from './components/ShareModal';
+import { PERSONA_ROLES, AI_MODELS, DEFAULT_MODEL_VERSION } from './constants';
+import { ChatMessage, ChatSession, ImageAttachment, PersonaRole, ChatFolder, PublicUserProfile, ContextualAnchor } from './types';
+import { useAuth, PlanTier } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
+import { AlertTriangle, Moon, X } from 'lucide-react';
 import { speechManager } from './lib/speechManager';
 import { calculateSessionTokens } from './lib/tokenCounter';
+import { estimateTextTokens } from './lib/tokenUsage';
 import { generateConversationSummary, getLocalFallbackSummary } from './lib/summarizer';
+import { getStoredAnchors, saveStoredAnchors, findMatchingAnchors, compileAnchorContext } from './lib/anchors';
+import { 
+  FOUNDER_EMAIL, 
+  isUserFounder, 
+  isFounderSessionActive, 
+  getStoredAnnouncement, 
+  getStoredGiveaways, 
+  SystemAnnouncement, 
+  Giveaway 
+} from './lib/founder';
+import { safeLoadSessions, validateAndSanitizeSession } from './lib/sessionRecovery';
+import { FeatureErrorBoundary } from './components/FeatureErrorBoundary';
 
 const STORAGE_KEY = 'smart_ai_assistant_sessions_v1';
 const FOLDERS_STORAGE_KEY = 'smart_ai_assistant_folders_v1';
@@ -30,7 +50,23 @@ const DEFAULT_FOLDERS: ChatFolder[] = [
   { id: 'folder-code', name: 'Code & Technical', color: '#10b981', createdAt: Date.now() - 1000, isCollapsed: false },
 ];
 
-function createDefaultSession(folderId?: string | null): ChatSession {
+export function stripRepetitiveGreetings(text: string): string {
+  if (!text) return '';
+  let cleaned = text
+    .replace(/^(hello|hi|greetings|hey)[!,.]?\s*(i\s*am|i'm|this\s*is|as)?\s*bolex[!,.]?\s*(an?\s+[\w\s]+assistant[!,.]?)?\s*/i, '')
+    .replace(/^hello[!,.]?\s*i['’\s]*m\s*bolex[!,.]?\s*/i, '')
+    .replace(/^(hello|hi|hey)[!,.]?\s*i\s*am\s*bolex[!,.]?\s*/i, '')
+    .replace(/^i\s*am\s*bolex[!,.]?\s*/i, '')
+    .replace(/^as\s*bolex[!,.]?\s*/i, '')
+    .trimStart();
+
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  }
+  return cleaned;
+}
+
+function createDefaultSession(folderId?: string | null, modelVersion?: string): ChatSession {
   return {
     id: `session-${Date.now()}`,
     title: 'New Chat',
@@ -38,26 +74,32 @@ function createDefaultSession(folderId?: string | null): ChatSession {
     updatedAt: Date.now(),
     messages: [],
     roleId: 'general',
+    modelVersion: modelVersion || DEFAULT_MODEL_VERSION,
     enableSearch: false,
     temperature: 0.7,
+    enableCognitiveTrace: true,
+    anchorsEnabled: true,
     folderId: folderId || null,
   };
 }
 
 export default function App() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return [createDefaultSession()];
+    const loaded = safeLoadSessions(STORAGE_KEY, createDefaultSession);
+    return loaded.map((s) => {
+      const sanitized = validateAndSanitizeSession(s);
+      if (!sanitized) return createDefaultSession();
+      const cleanedMessages = (sanitized.messages || []).map((m) =>
+        m.role === 'assistant'
+          ? { ...m, content: stripRepetitiveGreetings(m.content) }
+          : m
+      );
+      return {
+        ...sanitized,
+        messages: cleanedMessages,
+        summary: sanitized.summary || (cleanedMessages.length > 0 ? getLocalFallbackSummary(cleanedMessages, sanitized.title) : undefined),
+      };
+    });
   });
 
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
@@ -87,7 +129,26 @@ export default function App() {
     }
   }, [folders]);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bolex_sidebar_open');
+      if (saved !== null) return saved === 'true';
+    } catch {}
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('bolex_sidebar_open', String(next));
+      } catch {}
+      return next;
+    });
+  };
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
@@ -97,13 +158,62 @@ export default function App() {
   const [isMapStudioOpen, setIsMapStudioOpen] = useState(false);
   const [isPeopleSearchOpen, setIsPeopleSearchOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isAnchorsModalOpen, setIsAnchorsModalOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutTier, setCheckoutTier] = useState<PlanTier>('ultra');
+  const [isFounderAdminOpen, setIsFounderAdminOpen] = useState(false);
+  const [isGiveawayModalOpen, setIsGiveawayModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState<SystemAnnouncement>(() => getStoredAnnouncement());
+  const [giveaways, setGiveaways] = useState<Giveaway[]>(() => getStoredGiveaways());
   const [authModalMode, setAuthModalMode] = useState<'signin' | 'signup'>('signin');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Checking connection...');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { profile } = useAuth();
-  const { toggleTheme } = useTheme();
+  // Contextual Anchors & Persistent Memory State
+  const [anchors, setAnchors] = useState<ContextualAnchor[]>(() => getStoredAnchors());
+  const [globalCognitiveTrace, setGlobalCognitiveTrace] = useState(true);
+  const [globalQuantumReasoning, setGlobalQuantumReasoning] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bolex_quantum_reasoning') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // AI Model Architecture Version Selection (4.0 Omni, 3.8 Turbo, 2.0 Flash, o1 Deep Thinker)
+  const [defaultModelVersion, setDefaultModelVersion] = useState<string>(() => {
+    try {
+      return localStorage.getItem('bolex_default_model_version') || DEFAULT_MODEL_VERSION;
+    } catch {
+      return DEFAULT_MODEL_VERSION;
+    }
+  });
+
+  const handleSelectModelVersion = (modelId: string) => {
+    setDefaultModelVersion(modelId);
+    try {
+      localStorage.setItem('bolex_default_model_version', modelId);
+    } catch {}
+    updateActiveSession((s) => ({ ...s, modelVersion: modelId }));
+  };
+
+  // Persist anchors to localStorage
+  useEffect(() => {
+    saveStoredAnchors(anchors);
+  }, [anchors]);
+
+  const { user, profile } = useAuth();
+  const isFounder = isUserFounder(user?.email || profile?.email);
+  const { toggleTheme, resolvedTheme, setThemeMode } = useTheme();
+
+  // Auto-close founder modal if active user is not founder
+  useEffect(() => {
+    if (!isFounder && isFounderAdminOpen) {
+      setIsFounderAdminOpen(false);
+    }
+  }, [isFounder, isFounderAdminOpen]);
 
   // Comprehensive global keyboard shortcuts for productivity
   useEffect(() => {
@@ -140,6 +250,7 @@ export default function App() {
         setIsBolexPlusModalOpen(false);
         setIsMapStudioOpen(false);
         setIsPeopleSearchOpen(false);
+        setIsAnchorsModalOpen(false);
         setIsSidebarOpen(false);
         return;
       }
@@ -171,6 +282,15 @@ export default function App() {
         if (key === 'g') {
           e.preventDefault();
           updateActiveSession((s) => ({ ...s, enableSearch: !s.enableSearch }));
+        } else if (key === 'v') {
+          e.preventDefault();
+          setIsAnchorsModalOpen((prev) => !prev);
+        } else if (key === 'r') {
+          e.preventDefault();
+          updateActiveSession((s) => ({
+            ...s,
+            enableCognitiveTrace: !(s.enableCognitiveTrace ?? globalCognitiveTrace),
+          }));
         } else if (key === 'p') {
           e.preventDefault();
           setIsRoleModalOpen((prev) => !prev);
@@ -189,13 +309,32 @@ export default function App() {
         } else if (key === 't') {
           e.preventDefault();
           toggleTheme();
+        } else if (key === 'a') {
+          e.preventDefault();
+          if (isFounder) {
+            setIsFounderAdminOpen((prev) => !prev);
+          }
+        } else if (key === 'l') {
+          e.preventDefault();
+          setIsShareModalOpen((prev) => !prev);
+        } else if (key === 'q') {
+          e.preventDefault();
+          setGlobalQuantumReasoning((prev) => {
+            const next = !prev;
+            try {
+              localStorage.setItem('bolex_quantum_reasoning', String(next));
+            } catch {
+              // ignore
+            }
+            return next;
+          });
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTheme]);
+  }, [toggleTheme, globalCognitiveTrace, globalQuantumReasoning]);
 
   const activeSession =
     sessions.find((s) => s.id === activeSessionId && !s.isDeleted) ||
@@ -217,25 +356,29 @@ export default function App() {
     });
   }, []);
 
-  // Backfill 1-sentence summaries for chats that don't have one yet
+  // Defer AI 1-sentence summaries for sessions that need one asynchronously
   useEffect(() => {
-    sessions.forEach((s) => {
-      if (s.messages.length > 0 && !s.summary && !s.isSummaryLoading) {
-        const fallback = getLocalFallbackSummary(s.messages, s.title);
-        setSessions((prev) =>
-          prev.map((item) =>
-            item.id === s.id && !item.summary ? { ...item, summary: fallback } : item
-          )
-        );
-        generateConversationSummary(s.messages, s.title)
-          .then((aiSummary) => {
+    const timer = setTimeout(() => {
+      const needsSummary = sessions.filter(
+        (s) => s.messages.length > 0 && !s.summary && !s.isSummaryLoading
+      );
+      if (needsSummary.length === 0) return;
+
+      needsSummary.forEach(async (s) => {
+        try {
+          const aiSummary = await generateConversationSummary(s.messages, s.title);
+          if (aiSummary) {
             setSessions((prev) =>
               prev.map((item) => (item.id === s.id ? { ...item, summary: aiSummary } : item))
             );
-          })
-          .catch(() => {});
-      }
-    });
+          }
+        } catch {
+          // ignore
+        }
+      });
+    }, 1200);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // On-demand request to generate or refresh 1-sentence conversation summary
@@ -377,7 +520,7 @@ export default function App() {
 
   // Create new session (optionally in a folder)
   const handleNewSession = (folderId?: string | null) => {
-    const newSession = createDefaultSession(folderId);
+    const newSession = createDefaultSession(folderId, defaultModelVersion);
     setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
   };
@@ -501,13 +644,12 @@ export default function App() {
 
   // Clear current chat messages
   const handleClearChat = () => {
-    if (window.confirm('Clear all messages in this conversation?')) {
-      updateActiveSession((s) => ({
-        ...s,
-        messages: [],
-        updatedAt: Date.now(),
-      }));
-    }
+    if (activeSession.messages.length === 0) return;
+    updateActiveSession((s) => ({
+      ...s,
+      messages: [],
+      updatedAt: Date.now(),
+    }));
   };
 
   // Export current conversation as Markdown
@@ -600,6 +742,7 @@ export default function App() {
       image,
     };
 
+    const targetModelVersion = activeSession.modelVersion || defaultModelVersion;
     const assistantMessageId = `msg-${Date.now()}-ai`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
@@ -607,6 +750,7 @@ export default function App() {
       content: '',
       timestamp: Date.now(),
       isStreaming: true,
+      modelVersion: targetModelVersion,
     };
 
     const sourceMessages = baseMessages !== undefined ? baseMessages : activeSession.messages;
@@ -658,10 +802,43 @@ export default function App() {
         finalSystemPrompt += `\n\nAdditional user guidelines:\n${activeSession.customSystemPrompt.trim()}`;
       }
 
-      // Format payload messages
+      // Inject Contextual Anchors from Project Memory Vault
+      if (activeSession.anchorsEnabled !== false && anchors.length > 0) {
+        const matched = findMatchingAnchors(anchors, text, true);
+        if (matched.length > 0) {
+          const anchorContext = compileAnchorContext(matched);
+          finalSystemPrompt += anchorContext;
+        }
+      }
+
+      // Inject Cognitive Trace Mode if active
+      const isTraceActive = activeSession.enableCognitiveTrace ?? globalCognitiveTrace ?? true;
+      if (isTraceActive) {
+        finalSystemPrompt += `\n\n[COGNITIVE TRACE MODE ACTIVE]:
+Before outputting your final answer, you MUST enclose your raw internal chain of thought, logical breakdown, self-corrections, and design trade-offs inside <thought>...</thought> tags.
+Following the closing </thought> tag, output your clean, direct, articulate, and well-structured final answer.`;
+      }
+
+      // Inject Quantum Multi-Branch Hypothesis & Synthesis if active
+      const isQuantumActive =
+        globalQuantumReasoning ||
+        profile?.planTier === 'quantum' ||
+        profile?.isBolexQuantum;
+      if (isQuantumActive) {
+        finalSystemPrompt += `\n\n[QUANTUM MULTI-BRANCH HYPOTHESIS & CONSENSUS REASONING ACTIVE]:
+Analyze the problem through multiple parallel hypotheses or approaches before reaching consensus. Break down edge cases, performance benchmarks, and alternative perspectives systematically inside your <thought> tag before giving the optimal synthesis.`;
+      }
+
+      // Inject Conversational Discipline (prevent repetitive self-introductions)
+      finalSystemPrompt += `\n\n[CONVERSATIONAL DISCIPLINE]:
+- NEVER start responses with "Hello, I am Bolex", "Hi, I am Bolex", or repetitive robotic greetings.
+- Answer the user's prompt directly, immediately, and concisely.
+- Only introduce your identity if the user explicitly asks who you are or what your name is.`;
+
+      // Format payload messages (strip repetitive greetings from assistant history)
       const apiMessages = [...sourceMessages, userMessage].map((m) => ({
         role: m.role === 'user' ? 'user' : 'model',
-        content: m.content,
+        content: m.role === 'assistant' ? stripRepetitiveGreetings(m.content) : m.content,
         image: m.image
           ? {
               mimeType: m.image.mimeType,
@@ -670,23 +847,56 @@ export default function App() {
           : undefined,
       }));
 
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: apiMessages,
-          systemInstruction: finalSystemPrompt,
-          enableSearch: activeSession.enableSearch,
-          temperature: activeSession.temperature,
-        }),
-        signal: controller.signal,
-      });
+      let res: Response | null = null;
+      let lastFetchErr: any = null;
+      const requestStartTime = performance.now();
+      let firstTokenTime: number | null = null;
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server responded with status ${res.status}`);
+      // Resilient fetch with automatic retries for transient network drops or rate limit windows
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (controller.signal.aborted) break;
+
+          res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages: apiMessages,
+              systemInstruction: finalSystemPrompt,
+              enableSearch: activeSession.enableSearch,
+              temperature: activeSession.temperature,
+              modelVersion: targetModelVersion,
+            }),
+            signal: controller.signal,
+          });
+
+          if (res.ok) {
+            break;
+          }
+
+          // If rate limited or high demand, pause briefly and retry
+          if ((res.status === 429 || res.status === 503) && attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+            continue;
+          }
+
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || `Server responded with status ${res.status}`);
+        } catch (fetchErr: any) {
+          lastFetchErr = fetchErr;
+          if (fetchErr.name === 'AbortError') throw fetchErr;
+          if (attempt < 2 && !controller.signal.aborted) {
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          throw fetchErr;
+        }
+      }
+
+      if (!res || !res.ok) {
+        throw lastFetchErr || new Error('Connection failed. Please retry.');
       }
 
       const reader = res.body?.getReader();
@@ -704,7 +914,7 @@ export default function App() {
       const flushContentUpdate = () => {
         if (!pendingUpdate) return;
         pendingUpdate = false;
-        const currentText = accumulatedContent;
+        const currentText = stripRepetitiveGreetings(accumulatedContent);
         updateActiveSession((s) => {
           const msgs = [...s.messages];
           const lastIdx = msgs.findIndex((m) => m.id === assistantMessageId);
@@ -733,16 +943,19 @@ export default function App() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
+        // Normalize CRLF to LF and split on SSE double linebreaks
+        const normalized = buffer.replace(/\r\n/g, '\n');
+        const blocks = normalized.split('\n\n');
+        buffer = blocks.pop() || '';
 
-        for (const block of lines) {
-          if (!block.trim()) continue;
+        for (const block of blocks) {
+          const trimmedBlock = block.trim();
+          if (!trimmedBlock || trimmedBlock.startsWith(':')) continue; // Skip comments / keep-alives
 
           let eventType = 'chunk';
           let eventData = '';
 
-          const blockLines = block.split('\n');
+          const blockLines = trimmedBlock.split('\n');
           for (const line of blockLines) {
             if (line.startsWith('event: ')) {
               eventType = line.replace('event: ', '').trim();
@@ -755,11 +968,14 @@ export default function App() {
             try {
               const parsed = JSON.parse(eventData);
               if (parsed.text) {
+                if (firstTokenTime === null) {
+                  firstTokenTime = performance.now();
+                }
                 accumulatedContent += parsed.text;
                 scheduleContentUpdate();
               }
             } catch {
-              // ignore parse errors
+              // ignore partial chunk json parse
             }
           } else if (eventType === 'done') {
             try {
@@ -786,16 +1002,37 @@ export default function App() {
         animationFrameId = null;
       }
 
-      // Finalize assistant message
+      const requestEndTime = performance.now();
+      const totalLatencyMs = Math.round(requestEndTime - requestStartTime);
+      const ttftMs = firstTokenTime ? Math.round(firstTokenTime - requestStartTime) : Math.round(totalLatencyMs * 0.22);
+
+      // Finalize assistant message with greeting cleanup and performance metrics
+      const cleanFinalContent = stripRepetitiveGreetings(accumulatedContent);
+
+      const promptTokens = estimateTextTokens(text) + (image ? 258 : 0) + 16;
+      const completionTokens = estimateTextTokens(cleanFinalContent);
+      const generationDurationSec = Math.max(0.05, (totalLatencyMs - ttftMs) / 1000);
+      const tokensPerSecond = Number((completionTokens / generationDurationSec).toFixed(1));
+
+      const tokenMetrics = {
+        prompt: promptTokens,
+        completion: completionTokens,
+        total: promptTokens + completionTokens,
+        tokensPerSecond,
+      };
+
       updateActiveSession((s) => {
         const msgs = [...s.messages];
         const lastIdx = msgs.findIndex((m) => m.id === assistantMessageId);
         if (lastIdx !== -1) {
           msgs[lastIdx] = {
             ...msgs[lastIdx],
-            content: accumulatedContent,
+            content: cleanFinalContent,
             isStreaming: false,
             grounding: groundingData,
+            latencyMs: totalLatencyMs,
+            ttftMs,
+            tokenMetrics,
           };
         }
         return { ...s, messages: msgs };
@@ -808,7 +1045,7 @@ export default function App() {
         {
           id: assistantMessageId,
           role: 'assistant',
-          content: accumulatedContent,
+          content: cleanFinalContent,
           timestamp: Date.now(),
           grounding: groundingData,
           isStreaming: false,
@@ -858,6 +1095,14 @@ export default function App() {
       }
 
       if (
+        friendlyError.includes('Failed to fetch') ||
+        friendlyError.includes('NetworkError') ||
+        friendlyError.includes('Load failed') ||
+        friendlyError.includes('aborted') ||
+        friendlyError.includes('timeout')
+      ) {
+        friendlyError = 'Connection momentarily interrupted or AI service busy. Automatic reconnect was attempted. Please click "Retry Response".';
+      } else if (
         friendlyError.includes('503') ||
         friendlyError.includes('high demand') ||
         friendlyError.includes('UNAVAILABLE') ||
@@ -923,6 +1168,7 @@ export default function App() {
         onOpenExtension={() => setIsExtensionModalOpen(true)}
         onOpenMap={() => setIsMapStudioOpen(true)}
         onOpenPeopleSearch={() => setIsPeopleSearchOpen(true)}
+        onOpenAnchors={() => setIsAnchorsModalOpen(true)}
         onOpenAuth={() => {
           setAuthModalMode('signin');
           setIsAuthModalOpen(true);
@@ -930,6 +1176,10 @@ export default function App() {
         onOpenProfile={() => setIsProfileModalOpen(true)}
         onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
         onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+        onOpenFounder={() => setIsFounderAdminOpen(true)}
+        isFounder={isFounder}
+        onOpenShare={() => setIsShareModalOpen(true)}
+        onOpenGiveaways={() => setIsGiveawayModalOpen(true)}
         folders={folders}
         onCreateFolder={handleCreateFolder}
         onRenameFolder={handleRenameFolder}
@@ -944,18 +1194,49 @@ export default function App() {
 
       {/* Main chat column */}
       <div className="flex-1 flex flex-col h-full min-w-0 relative bg-neutral-900/30">
+        {/* Global Announcement & Broadcast Banner (Managed by Founder Tayden Simon) */}
+        <GlobalAnnouncementBanner
+          announcement={announcement}
+          isFounder={isFounder}
+          onOpenFounder={() => setIsFounderAdminOpen(true)}
+          onActionClick={(actionType) => {
+            if (actionType === 'open_giveaway') setIsGiveawayModalOpen(true);
+            else if (actionType === 'open_plus') setIsBolexPlusModalOpen(true);
+            else if (actionType === 'open_share') setIsShareModalOpen(true);
+          }}
+        />
+
         {/* Header */}
         <Header
           currentRole={currentRole}
+          isSidebarOpen={isSidebarOpen}
           onOpenRoles={() => setIsRoleModalOpen(true)}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onOpenExtension={() => setIsExtensionModalOpen(true)}
           onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
           onOpenMap={() => setIsMapStudioOpen(true)}
           onOpenPeopleSearch={() => setIsPeopleSearchOpen(true)}
+          onOpenAnchors={() => setIsAnchorsModalOpen(true)}
+          activeAnchorsCount={anchors.filter((a) => a.isEnabled).length}
+          enableCognitiveTrace={activeSession.enableCognitiveTrace ?? globalCognitiveTrace}
+          onToggleCognitiveTrace={() => {
+            const next = !(activeSession.enableCognitiveTrace ?? globalCognitiveTrace);
+            setGlobalCognitiveTrace(next);
+            updateActiveSession((s) => ({ ...s, enableCognitiveTrace: next }));
+          }}
+          enableQuantumReasoning={globalQuantumReasoning || profile?.planTier === 'quantum' || profile?.isBolexQuantum}
+          onToggleQuantumReasoning={() => {
+            setGlobalQuantumReasoning((prev) => {
+              const next = !prev;
+              try {
+                localStorage.setItem('bolex_quantum_reasoning', String(next));
+              } catch {}
+              return next;
+            });
+          }}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           onNewChat={handleNewSession}
-          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          onToggleSidebar={handleToggleSidebar}
           enableSearch={activeSession.enableSearch}
           onToggleSearch={() =>
             updateActiveSession((s) => ({ ...s, enableSearch: !s.enableSearch }))
@@ -967,10 +1248,42 @@ export default function App() {
             setIsAuthModalOpen(true);
           }}
           onOpenProfile={() => setIsProfileModalOpen(true)}
+          onOpenFounder={() => setIsFounderAdminOpen(true)}
+          isFounder={isFounder}
+          onOpenShare={() => setIsShareModalOpen(true)}
+          onOpenGiveaways={() => setIsGiveawayModalOpen(true)}
+          activeGiveawaysCount={giveaways.filter((g) => g.status === 'active').length}
           hasMessages={activeSession.messages.length > 0}
           isBackendConnected={isBackendConnected}
           sessionTokens={activeSessionTokens}
+          selectedModelVersion={activeSession.modelVersion || defaultModelVersion}
+          onSelectModelVersion={handleSelectModelVersion}
         />
+
+        {/* Light Mode "Not Recommended" Warning Banner */}
+        {resolvedTheme === 'light' && (
+          <div
+            id="light-mode-warning-banner"
+            className="bg-amber-500/15 border-b border-amber-500/30 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 text-xs text-amber-900 dark:text-amber-200 z-10 animate-banner-slide-down shadow-xs"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="text-xs text-amber-900 font-medium">
+                <strong className="font-bold">Light Mode (Not Recommended):</strong> May cause eye strain &amp; color mismatch. Dark mode is normal and recommended.
+              </span>
+            </div>
+            <button
+              id="revert-dark-mode-btn"
+              type="button"
+              onClick={() => setThemeMode('dark')}
+              className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-amber-400 font-semibold text-[11px] transition-colors flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer border border-neutral-700 animate-pulse-glow hover:scale-105 active:scale-95"
+              title="Switch back to recommended Dark Mode"
+            >
+              <Moon className="w-3.5 h-3.5 text-purple-400" />
+              <span>Use Dark Mode</span>
+            </button>
+          </div>
+        )}
 
         {/* Scrollable messages container */}
         <main
@@ -996,6 +1309,15 @@ export default function App() {
                 <MessageItem
                   key={message.id}
                   message={message}
+                  index={index}
+                  totalCount={activeSession.messages.length}
+                  sessionId={activeSession.id}
+                  sessionTitle={activeSession.title}
+                  userPromptSnippet={
+                    index > 0 && activeSession.messages[index - 1]?.role === 'user'
+                      ? activeSession.messages[index - 1].content.slice(0, 200)
+                      : undefined
+                  }
                   isLastAssistant={
                     message.role === 'assistant' &&
                     index === activeSession.messages.length - 1
@@ -1017,9 +1339,29 @@ export default function App() {
           onToggleSearch={() =>
             updateActiveSession((s) => ({ ...s, enableSearch: !s.enableSearch }))
           }
+          enableCognitiveTrace={activeSession.enableCognitiveTrace ?? globalCognitiveTrace}
+          onToggleCognitiveTrace={() => {
+            const next = !(activeSession.enableCognitiveTrace ?? globalCognitiveTrace);
+            setGlobalCognitiveTrace(next);
+            updateActiveSession((s) => ({ ...s, enableCognitiveTrace: next }));
+          }}
+          enableQuantumReasoning={globalQuantumReasoning || profile?.planTier === 'quantum' || profile?.isBolexQuantum}
+          onToggleQuantumReasoning={() => {
+            setGlobalQuantumReasoning((prev) => {
+              const next = !prev;
+              try {
+                localStorage.setItem('bolex_quantum_reasoning', String(next));
+              } catch {}
+              return next;
+            });
+          }}
+          anchors={anchors}
+          onOpenAnchors={() => setIsAnchorsModalOpen(true)}
           onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           sessionTokens={activeSessionTokens}
+          selectedModelVersion={activeSession.modelVersion || defaultModelVersion}
+          onSelectModelVersion={handleSelectModelVersion}
         />
       </div>
 
@@ -1051,6 +1393,9 @@ export default function App() {
         sessions={sessions}
         activeSessionId={activeSession.id}
         onSelectSession={(id) => setActiveSessionId(id)}
+        selectedModelVersion={activeSession.modelVersion || defaultModelVersion}
+        onSelectModelVersion={handleSelectModelVersion}
+        onOpenBolexPlus={() => setIsBolexPlusModalOpen(true)}
       />
 
       {/* Browser Extension Modal */}
@@ -1082,20 +1427,57 @@ export default function App() {
       <BolexPlusModal
         isOpen={isBolexPlusModalOpen}
         onClose={() => setIsBolexPlusModalOpen(false)}
+        onOpenCheckout={(tier) => {
+          setCheckoutTier(tier);
+          setIsCheckoutOpen(true);
+        }}
+      />
+
+      {/* Bolex Pay Checkout Modal (Real subscriptions & license key validation) */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        targetTier={checkoutTier}
+      />
+
+      {/* Founder Admin Console Modal (Exclusively for Tayden Simon) */}
+      <FounderAdminModal
+        isOpen={isFounderAdminOpen}
+        onClose={() => setIsFounderAdminOpen(false)}
+        onAnnouncementUpdated={(updated) => setAnnouncement(updated)}
+        onGiveawaysUpdated={(updated) => setGiveaways(updated)}
+      />
+
+      {/* Community Giveaways Modal (Free public entry) */}
+      <GiveawayModal
+        isOpen={isGiveawayModalOpen}
+        onClose={() => setIsGiveawayModalOpen(false)}
+        giveaways={giveaways}
+        onGiveawaysUpdated={(updated) => setGiveaways(updated)}
+        onOpenFounder={() => setIsFounderAdminOpen(true)}
+        isFounder={isFounder}
+      />
+
+      {/* Real App Link & Share Studio Modal */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
       />
 
       {/* Bolex Map Studio Modal (10 Features) */}
-      <MapStudioModal
-        isOpen={isMapStudioOpen}
-        onClose={() => setIsMapStudioOpen(false)}
-        activeSession={activeSession}
-        onSendToChat={(prompt, requiresSearch) => {
-          if (requiresSearch) {
-            updateActiveSession((s) => ({ ...s, enableSearch: true }));
-          }
-          handleSendMessage(prompt);
-        }}
-      />
+      <FeatureErrorBoundary featureName="Map Studio">
+        <MapStudioModal
+          isOpen={isMapStudioOpen}
+          onClose={() => setIsMapStudioOpen(false)}
+          activeSession={activeSession}
+          onSendToChat={(prompt, requiresSearch) => {
+            if (requiresSearch) {
+              updateActiveSession((s) => ({ ...s, enableSearch: true }));
+            }
+            handleSendMessage(prompt);
+          }}
+        />
+      </FeatureErrorBoundary>
 
       {/* People Search Modal (Search real community accounts • Zero Bots) */}
       <PeopleSearchModal
@@ -1117,6 +1499,17 @@ export default function App() {
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
       />
+
+      {/* Contextual Anchors & Persistent Memory Vault */}
+      <FeatureErrorBoundary featureName="Contextual Memory Vault">
+        <ContextualAnchorsModal
+          isOpen={isAnchorsModalOpen}
+          onClose={() => setIsAnchorsModalOpen(false)}
+          anchors={anchors}
+          onSaveAnchors={(updated) => setAnchors(updated)}
+          onSendToChat={(prompt) => handleSendMessage(prompt)}
+        />
+      </FeatureErrorBoundary>
     </div>
   );
 }

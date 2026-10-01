@@ -33,7 +33,12 @@ import {
   Moon,
   Sliders,
   Palette,
-  Keyboard
+  Keyboard,
+  Anchor,
+  Share2,
+  Trophy,
+  PanelLeft,
+  PanelLeftClose
 } from 'lucide-react';
 import { ChatSession, ChatFolder } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -65,10 +70,15 @@ interface SidebarProps {
   onOpenExtension: () => void;
   onOpenMap?: () => void;
   onOpenPeopleSearch?: () => void;
+  onOpenAnchors?: () => void;
   onOpenAuth: () => void;
   onOpenProfile: () => void;
   onOpenBolexPlus?: () => void;
   onOpenShortcuts?: () => void;
+  onOpenFounder?: () => void;
+  isFounder?: boolean;
+  onOpenShare?: () => void;
+  onOpenGiveaways?: () => void;
 
   // Folder Organization
   folders: ChatFolder[];
@@ -99,10 +109,15 @@ export function Sidebar({
   onOpenExtension,
   onOpenMap,
   onOpenPeopleSearch,
+  onOpenAnchors,
   onOpenAuth,
   onOpenProfile,
   onOpenBolexPlus,
   onOpenShortcuts,
+  onOpenFounder,
+  isFounder = false,
+  onOpenShare,
+  onOpenGiveaways,
   folders,
   onCreateFolder,
   onRenameFolder,
@@ -161,6 +176,64 @@ export function Sidebar({
   const [isTrashCollapsed, setIsTrashCollapsed] = useState(true);
   const [isEmptyTrashConfirmOpen, setIsEmptyTrashConfirmOpen] = useState(false);
 
+  // View Mode: 'both' (default) | 'chats' | 'features'
+  const [viewMode, setViewMode] = useState<'both' | 'chats' | 'features'>(() => {
+    try {
+      const stored = localStorage.getItem('bolex_sidebar_view_mode');
+      if (stored === 'both' || stored === 'chats' || stored === 'features') {
+        return stored;
+      }
+    } catch {}
+    return 'both';
+  });
+
+  const handleSetViewMode = (mode: 'both' | 'chats' | 'features') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('bolex_sidebar_view_mode', mode);
+    } catch {}
+  };
+
+  // Collapsible Chat History section state (when in 'both' view mode)
+  const [isChatsCollapsed, setIsChatsCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('bolex_sidebar_chats_collapsed');
+      return stored !== null ? stored === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleChatsCollapse = () => {
+    setIsChatsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('bolex_sidebar_chats_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Collapsible Tools & Features Drawer (Defaults to false so user can see both with collapse buttons)
+  const [isFeaturesCollapsed, setIsFeaturesCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('bolex_sidebar_features_collapsed');
+      return stored !== null ? stored === 'true' : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleFeaturesCollapse = () => {
+    setIsFeaturesCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('bolex_sidebar_features_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // Filtered sessions (excluding soft-deleted ones for active lists)
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return sessions;
@@ -183,6 +256,37 @@ export function Sidebar({
   const unassignedSessions = useMemo(() => {
     return activeSessions.filter((s) => !s.isPinned && !s.folderId);
   }, [activeSessions]);
+
+  // Chronological grouping (Today, Yesterday, Previous 7 Days, Previous 30 Days, Older)
+  const groupedUnassignedSessions = useMemo(() => {
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000;
+    const groups: { [key: string]: ChatSession[] } = {
+      Today: [],
+      Yesterday: [],
+      'Previous 7 Days': [],
+      'Previous 30 Days': [],
+      Older: [],
+    };
+
+    unassignedSessions.forEach((session) => {
+      const time = session.updatedAt || session.createdAt || now;
+      const diff = now - time;
+      if (diff < oneDay) {
+        groups.Today.push(session);
+      } else if (diff < 2 * oneDay) {
+        groups.Yesterday.push(session);
+      } else if (diff < 7 * oneDay) {
+        groups['Previous 7 Days'].push(session);
+      } else if (diff < 30 * oneDay) {
+        groups['Previous 30 Days'].push(session);
+      } else {
+        groups.Older.push(session);
+      }
+    });
+
+    return Object.entries(groups).filter(([_, list]) => list.length > 0);
+  }, [unassignedSessions]);
 
   const deletedSessions = useMemo(() => {
     return filteredSessions.filter((s) => s.isDeleted);
@@ -224,12 +328,14 @@ export function Sidebar({
       )}
 
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-40 w-64 sm:w-72 bg-neutral-950 border-r border-neutral-800 flex flex-col transition-transform duration-200 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`fixed md:relative inset-y-0 left-0 z-40 h-full bg-neutral-950 border-r border-neutral-800/80 flex flex-col transition-all duration-300 ease-in-out shrink-0 select-none ${
+          isOpen
+            ? 'w-72 sm:w-80 translate-x-0 opacity-100'
+            : 'w-0 -translate-x-full md:translate-x-0 md:w-0 border-r-0 overflow-hidden opacity-0 pointer-events-none'
         }`}
       >
-        {/* Top bar with New Chat & New Folder */}
-        <div className="p-3 border-b border-neutral-800 space-y-2">
+        {/* Top bar with New Chat & Quick Actions */}
+        <div className="p-3 border-b border-neutral-800/80 space-y-2 shrink-0">
           <div className="flex items-center gap-1.5">
             <button
               id="sidebar-new-chat-btn"
@@ -238,7 +344,7 @@ export function Sidebar({
                 onNewSession();
                 onClose();
               }}
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs sm:text-sm transition-colors shadow-xs cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs sm:text-sm transition-colors shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>New Chat</span>
@@ -248,7 +354,7 @@ export function Sidebar({
               id="sidebar-new-folder-btn"
               type="button"
               onClick={() => setIsCreatingFolder((prev) => !prev)}
-              className={`p-2 rounded-lg transition-all border ${
+              className={`p-2 rounded-lg transition-all border cursor-pointer ${
                 isCreatingFolder
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
                   : 'bg-neutral-900 text-neutral-300 hover:text-white border-neutral-800 hover:border-neutral-700'
@@ -263,7 +369,7 @@ export function Sidebar({
                 id="sidebar-export-all-btn"
                 type="button"
                 onClick={onExportAllSessions}
-                className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors border border-neutral-800"
+                className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors border border-neutral-800 cursor-pointer"
                 title="Backup all chats as JSON"
               >
                 <Download className="w-4 h-4" />
@@ -274,10 +380,10 @@ export function Sidebar({
               id="sidebar-close-btn"
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 md:hidden"
-              title="Close sidebar"
+              className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors border border-neutral-800/60 cursor-pointer"
+              title="Collapse sidebar (Ctrl+B)"
             >
-              <X className="w-4 h-4" />
+              <PanelLeftClose className="w-4 h-4" />
             </button>
           </div>
 
@@ -332,34 +438,126 @@ export function Sidebar({
               </div>
             </form>
           )}
+        </div>
 
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search conversations..."
-              className="w-full pl-8 pr-7 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-neutral-200 placeholder-neutral-400 focus:outline-hidden focus:border-amber-500/50 transition-colors"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+        {/* View Mode Segmented Control: Both / Chats / Tools */}
+        <div className="px-3 pt-2 pb-2 border-b border-neutral-800/80 bg-neutral-950 shrink-0">
+          <div className="grid grid-cols-3 p-1 rounded-xl bg-neutral-900 border border-neutral-800 text-[11px] font-medium text-neutral-400">
+            <button
+              id="sidebar-view-both-btn"
+              type="button"
+              onClick={() => handleSetViewMode('both')}
+              className={`py-1.5 px-1 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'both'
+                  ? 'bg-neutral-800 text-amber-300 font-bold shadow-xs'
+                  : 'hover:text-neutral-200'
+              }`}
+              title="View both Chat History & Features with collapsible sections"
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+              <span>Both</span>
+            </button>
+            <button
+              id="sidebar-view-chats-btn"
+              type="button"
+              onClick={() => handleSetViewMode('chats')}
+              className={`py-1.5 px-1 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'chats'
+                  ? 'bg-neutral-800 text-amber-300 font-bold shadow-xs'
+                  : 'hover:text-neutral-200'
+              }`}
+              title="Focus solely on Chat History"
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
+              <span>Chats ({activeSessions.length})</span>
+            </button>
+            <button
+              id="sidebar-view-features-btn"
+              type="button"
+              onClick={() => handleSetViewMode('features')}
+              className={`py-1.5 px-1 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'features'
+                  ? 'bg-neutral-800 text-amber-300 font-bold shadow-xs'
+                  : 'hover:text-neutral-200'
+              }`}
+              title="Focus solely on Tools & Features"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Tools ({isFounder ? '8' : '7'})</span>
+            </button>
           </div>
         </div>
 
-        {/* Sessions & Folders list */}
-        <div 
-          className="flex-1 overflow-y-auto px-2 py-2 space-y-4"
-          onScroll={() => setHoveredSession(null)}
-        >
+        {/* Main Content Area: Split or Focused based on viewMode */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* SECTION 1: CHAT HISTORY */}
+          {(viewMode === 'both' || viewMode === 'chats') && (
+            <div
+              className={`flex flex-col min-h-0 transition-all duration-200 ${
+                viewMode === 'chats'
+                  ? 'flex-1'
+                  : isChatsCollapsed
+                  ? 'shrink-0'
+                  : isFeaturesCollapsed
+                  ? 'flex-1'
+                  : 'flex-1 min-h-[160px]'
+              }`}
+            >
+              {/* Collapsible Header for Chat History (shown in 'both' mode) */}
+              {viewMode === 'both' && (
+                <div
+                  onClick={toggleChatsCollapse}
+                  className="flex items-center justify-between px-3 py-2 bg-neutral-900/60 hover:bg-neutral-900 border-b border-neutral-800/80 cursor-pointer select-none transition-colors shrink-0 group"
+                  title={isChatsCollapsed ? "Click to expand Chat History" : "Click to collapse Chat History"}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-0.5 rounded text-amber-400 group-hover:scale-110 transition-transform">
+                      {isChatsCollapsed ? (
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                    <MessageSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="text-xs font-semibold text-neutral-200 group-hover:text-white">
+                      Chat History
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-amber-300 font-mono">
+                      {activeSessions.length}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 font-mono">
+                    {isChatsCollapsed ? 'Tap to expand' : 'Collapse'}
+                  </span>
+                </div>
+              )}
+
+              {/* Chat History Body (Shown if in 'chats' mode OR if not collapsed in 'both' mode) */}
+              {(viewMode === 'chats' || !isChatsCollapsed) && (
+                <div 
+                  className="flex-1 overflow-y-auto px-2 py-2 space-y-3"
+                  onScroll={() => setHoveredSession(null)}
+                >
+                  {/* Search bar inside Chat History */}
+                  <div className="relative mb-2">
+                    <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                      className="w-full pl-8 pr-7 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-xs text-neutral-200 placeholder-neutral-400 focus:outline-hidden focus:border-amber-500/50 transition-colors"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
           {/* Pinned Section */}
           {pinnedSessions.length > 0 && (
             <div className="space-y-1">
@@ -721,114 +919,121 @@ export function Sidebar({
                 All conversations organized in folders.
               </div>
             ) : (
-              unassignedSessions.map((session) => {
-                const isActive = session.id === activeSessionId;
-                const isMoveMenuOpen = sessionFolderMenuId === session.id;
-
-                return (
-                  <div
-                    key={session.id}
-                    onClick={() => {
-                      onSelectSession(session.id);
-                      onClose();
-                    }}
-                    className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer text-xs sm:text-sm transition-all relative ${
-                      isActive
-                        ? 'bg-neutral-800 text-white font-medium shadow-xs border border-neutral-700/60'
-                        : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200 border border-transparent'
-                    }`}
-                  >
-                    <div 
-                      className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
-                      onMouseEnter={(e) => handleTitleMouseEnter(session, e)}
-                      onMouseLeave={handleTitleMouseLeave}
-                      title={session.summary ? `Summary: ${session.summary}` : session.title}
-                    >
-                      <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-neutral-400'}`} />
-                      <span className="truncate group-hover:text-amber-200 transition-colors font-medium">
-                        {session.title || 'Untitled conversation'}
-                      </span>
-                      {session.summary && (
-                        <Sparkles className="w-2.5 h-2.5 shrink-0 text-amber-400/70 group-hover:text-amber-400 transition-colors" />
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {/* Move to folder trigger */}
-                      {folders.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSessionFolderMenuId(isMoveMenuOpen ? null : session.id);
-                          }}
-                          className="p-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-amber-300"
-                          title="Move to folder"
-                        >
-                          <FolderInput className="w-3 h-3" />
-                        </button>
-                      )}
-
-                      {onTogglePinSession && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTogglePinSession(session.id, e);
-                          }}
-                          className="p-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-amber-300"
-                          title="Pin to top"
-                        >
-                          <Pin className="w-3 h-3" />
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteSession(session.id, e);
-                        }}
-                        className="p-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-rose-400"
-                        title="Move to Trash"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-
-                      {/* Move Session Popover */}
-                      {isMoveMenuOpen && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-6 z-50 w-48 p-1 rounded-xl bg-neutral-900 border border-neutral-700 shadow-xl text-xs space-y-0.5 animate-in fade-in duration-100"
-                        >
-                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                            Move to Folder
-                          </div>
-                          {folders.map((f) => (
-                            <button
-                              key={f.id}
-                              type="button"
-                              onClick={() => {
-                                onMoveSessionToFolder(session.id, f.id);
-                                setSessionFolderMenuId(null);
-                              }}
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <div
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: f.color || '#f59e0b' }}
-                                />
-                                <span className="truncate">{f.name}</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+              groupedUnassignedSessions.map(([groupName, groupList]) => (
+                <div key={groupName} className="space-y-0.5 mb-2.5">
+                  <div className="px-2 pt-1.5 pb-0.5 text-[10px] font-bold text-neutral-500 tracking-wider uppercase">
+                    {groupName}
                   </div>
-                );
-              })
+                  {groupList.map((session) => {
+                    const isActive = session.id === activeSessionId;
+                    const isMoveMenuOpen = sessionFolderMenuId === session.id;
+
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => {
+                          onSelectSession(session.id);
+                          onClose();
+                        }}
+                        className={`group flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer text-xs sm:text-sm transition-all relative ${
+                          isActive
+                            ? 'bg-neutral-800 text-white font-medium shadow-xs border border-neutral-700/60'
+                            : 'text-neutral-400 hover:bg-neutral-900 hover:text-neutral-200 border border-transparent'
+                        }`}
+                      >
+                        <div 
+                          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+                          onMouseEnter={(e) => handleTitleMouseEnter(session, e)}
+                          onMouseLeave={handleTitleMouseLeave}
+                          title={session.summary ? `Summary: ${session.summary}` : session.title}
+                        >
+                          <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-neutral-500 group-hover:text-neutral-300'}`} />
+                          <span className="truncate group-hover:text-amber-200 transition-colors font-medium">
+                            {session.title || 'Untitled conversation'}
+                          </span>
+                          {session.summary && (
+                            <Sparkles className="w-2.5 h-2.5 shrink-0 text-amber-400/70 group-hover:text-amber-400 transition-colors" />
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Move to folder trigger */}
+                          {folders.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSessionFolderMenuId(isMoveMenuOpen ? null : session.id);
+                              }}
+                              className="p-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-amber-300"
+                              title="Move to folder"
+                            >
+                              <FolderInput className="w-3 h-3" />
+                            </button>
+                          )}
+
+                          {onTogglePinSession && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTogglePinSession(session.id, e);
+                              }}
+                              className="p-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-amber-300"
+                              title="Pin to top"
+                            >
+                              <Pin className="w-3 h-3" />
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteSession(session.id, e);
+                            }}
+                            className="p-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-rose-400"
+                            title="Move to Trash"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+
+                          {/* Move Session Popover */}
+                          {isMoveMenuOpen && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-6 z-50 w-48 p-1 rounded-xl bg-neutral-900 border border-neutral-700 shadow-xl text-xs space-y-0.5 animate-in fade-in duration-100"
+                            >
+                              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                Move to Folder
+                              </div>
+                              {folders.map((f) => (
+                                <button
+                                  key={f.id}
+                                  type="button"
+                                  onClick={() => {
+                                    onMoveSessionToFolder(session.id, f.id);
+                                    setSessionFolderMenuId(null);
+                                  }}
+                                  className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <div
+                                      className="w-2 h-2 rounded-full shrink-0"
+                                      style={{ backgroundColor: f.color || '#f59e0b' }}
+                                    />
+                                    <span className="truncate">{f.name}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
             )}
           </div>
 
@@ -917,127 +1122,223 @@ export function Sidebar({
             </div>
           )}
         </div>
+      )}
+    </div>
+  )}
 
-        {/* Bottom Cards: Bolex Studio Map, Extension & User Account */}
-        <div className="p-3 border-t border-neutral-800/80 bg-neutral-900/50 space-y-2">
-          {/* Bolex Map Studio Button */}
-          {onOpenMap && (
-            <button
-              id="sidebar-map-studio-btn"
-              type="button"
-              onClick={() => {
-                onOpenMap();
-                onClose();
-              }}
-              className="w-full p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-amber-500/50 text-left transition-colors flex items-center justify-between group cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
-                  <Compass className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors">
-                    Bolex Map Studio
-                  </div>
-                  <div className="text-[10px] text-neutral-400">
-                    Mind Map & Geo Explorer
-                  </div>
-                </div>
-              </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25 font-mono">
-                10-Feature
-              </span>
-            </button>
-          )}
-
-          {/* Search People (Bolex Accounts) Button */}
-          {onOpenPeopleSearch && (
-            <button
-              id="sidebar-search-people-btn"
-              type="button"
-              onClick={() => {
-                onOpenPeopleSearch();
-                onClose();
-              }}
-              className="w-full p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-amber-500/50 text-left transition-colors flex items-center justify-between group cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors">
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors">
-                    Search People
-                  </div>
-                  <div className="text-[10px] text-neutral-400">
-                    Real Accounts • Zero Bots
-                  </div>
-                </div>
-              </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 font-mono">
-                People
-              </span>
-            </button>
-          )}
-
-          {/* Bolex Tier Membership Card */}
-          {onOpenBolexPlus && (
-            <button
-              id="sidebar-bolex-plus-card-btn"
-              type="button"
-              onClick={() => {
-                onOpenBolexPlus();
-                onClose();
-              }}
-              className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between group ${
-                effectiveTier === 'quantum'
-                  ? 'bg-cyan-950/30 border-cyan-500/50 hover:bg-cyan-950/50'
-                  : effectiveTier === 'ultra'
-                  ? 'bg-purple-950/30 border-purple-500/50 hover:bg-purple-950/50'
-                  : effectiveTier === 'plus'
-                  ? 'bg-amber-950/30 border-amber-500/40 hover:bg-amber-950/50'
-                  : 'bg-neutral-900/90 border-neutral-800 hover:border-amber-500/40'
+          {/* SECTION 2: TOOLS & FEATURES */}
+          {(viewMode === 'both' || viewMode === 'features') && (
+            <div
+              className={`flex flex-col min-h-0 border-t border-neutral-800/80 bg-neutral-950 transition-all duration-200 ${
+                viewMode === 'features'
+                  ? 'flex-1'
+                  : isFeaturesCollapsed
+                  ? 'shrink-0'
+                  : isChatsCollapsed
+                  ? 'flex-1'
+                  : 'flex-1 min-h-[140px]'
               }`}
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${
-                  effectiveTier === 'quantum'
-                    ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
-                    : effectiveTier === 'ultra'
-                    ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
-                    : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                }`}>
-                  {effectiveTier === 'quantum' ? <Sparkles className="w-4 h-4 text-cyan-400 animate-spin" /> : effectiveTier === 'ultra' ? <Flame className="w-4 h-4 fill-purple-400/20" /> : <Crown className="w-4 h-4" />}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span>{effectiveTier === 'quantum' ? 'Bolex Quantum' : effectiveTier === 'ultra' ? 'Bolex Ultra' : effectiveTier === 'plus' ? 'Bolex Plus' : 'Membership Tiers'}</span>
+              {/* Collapsible Header for Tools & Features */}
+              <div
+                id="sidebar-toggle-features-btn"
+                onClick={viewMode === 'both' ? toggleFeaturesCollapse : undefined}
+                className={`flex items-center justify-between px-3 py-2 bg-neutral-900/60 border-b border-neutral-800/80 select-none shrink-0 ${
+                  viewMode === 'both' ? 'hover:bg-neutral-900 cursor-pointer group' : ''
+                }`}
+                title={viewMode === 'both' ? (isFeaturesCollapsed ? "Click to expand Tools & Features" : "Click to collapse Tools & Features") : undefined}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {viewMode === 'both' && (
+                    <div className="p-0.5 rounded text-amber-400 group-hover:scale-110 transition-transform">
+                      {isFeaturesCollapsed ? (
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </div>
+                  )}
+                  <div className="p-1 rounded bg-amber-500/10 text-amber-400">
+                    <Layers className="w-3.5 h-3.5" />
                   </div>
-                  <div className="text-[10px] text-neutral-400 truncate">
-                    {effectiveTier === 'quantum'
-                      ? 'Consensus Engine + Unlimited Memory'
-                      : effectiveTier === 'ultra'
-                      ? '∞ Tokens + 1M Memory & Ultra Lane'
-                      : effectiveTier === 'plus'
-                      ? '∞ Tokens & Web Speech Studio'
-                      : 'Free 60 tokens • 3-Day Trials'}
-                  </div>
+                  <span className="text-xs font-semibold text-neutral-200 group-hover:text-white">
+                    Tools &amp; Workspaces
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-amber-300 font-mono">
+                    {isFounder ? '8' : '7'}
+                  </span>
                 </div>
+                {viewMode === 'both' && (
+                  <span className="text-[10px] text-neutral-400 font-mono">
+                    {isFeaturesCollapsed ? 'Tap to expand' : 'Collapse'}
+                  </span>
+                )}
               </div>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-semibold shrink-0 transition-colors ${
-                effectiveTier === 'quantum'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                  : effectiveTier === 'ultra'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                  : effectiveTier === 'plus' 
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                  : 'bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold'
-              }`}>
-                {effectiveTier === 'quantum' ? 'Quantum' : effectiveTier === 'ultra' ? 'Ultra' : effectiveTier === 'plus' ? 'Perks' : '3-Day Trial'}
-              </span>
-            </button>
-          )}
 
+              {/* Tools & Features List */}
+              {(viewMode === 'features' || !isFeaturesCollapsed) && (
+                <div className="flex-1 overflow-y-auto p-2 space-y-1.5 animate-in fade-in duration-150">
+                  {/* Bolex Map Studio */}
+                  {onOpenMap && (
+                    <button
+                      id="sidebar-map-studio-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenMap();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Compass className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-neutral-200 group-hover:text-white font-medium">Map Studio</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0">Map</span>
+                    </button>
+                  )}
+
+                  {/* Search People */}
+                  {onOpenPeopleSearch && (
+                    <button
+                      id="sidebar-search-people-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenPeopleSearch();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-neutral-200 group-hover:text-white font-medium">Search People</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 font-mono shrink-0">Users</span>
+                    </button>
+                  )}
+
+                  {/* Contextual Anchors / Memory Vault */}
+                  {onOpenAnchors && (
+                    <button
+                      id="sidebar-anchors-vault-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenAnchors();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Anchor className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-neutral-200 group-hover:text-white font-medium">Memory Vault</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 font-mono shrink-0">Vault</span>
+                    </button>
+                  )}
+
+                  {/* Browser Extension */}
+                  <button
+                    id="sidebar-extension-btn"
+                    type="button"
+                    onClick={() => {
+                      onOpenExtension();
+                      onClose();
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group text-xs cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Chrome className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="truncate text-neutral-200 group-hover:text-white font-medium">Browser Extension</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-400 font-mono shrink-0">V3</span>
+                  </button>
+
+                  {/* Real Link & Share App */}
+                  {onOpenShare && (
+                    <button
+                      id="sidebar-share-app-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenShare();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Share2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-neutral-200 group-hover:text-white font-medium">Share App Link</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 font-mono shrink-0">Live</span>
+                    </button>
+                  )}
+
+                  {/* Community Giveaways */}
+                  {onOpenGiveaways && (
+                    <button
+                      id="sidebar-giveaways-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenGiveaways();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Trophy className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate text-neutral-200 group-hover:text-white font-medium">Giveaways</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 font-mono shrink-0">Win VIP</span>
+                    </button>
+                  )}
+
+                  {/* Bolex Tier Membership & Trials */}
+                  {onOpenBolexPlus && (
+                    <button
+                      id="sidebar-bolex-plus-card-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenBolexPlus();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-neutral-900/70 hover:bg-neutral-850 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-neutral-200 group-hover:text-white font-medium">Membership Tiers</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 uppercase font-semibold shrink-0">
+                        {effectiveTier}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Founder Admin Console (Tayden Simon) */}
+                  {isFounder && onOpenFounder && (
+                    <button
+                      id="sidebar-founder-console-btn"
+                      type="button"
+                      onClick={() => {
+                        onOpenFounder();
+                        onClose();
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-left transition-colors flex items-center justify-between group cursor-pointer text-xs border border-amber-500/30"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-amber-300 font-bold">Founder Console</span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500 text-neutral-950 font-bold shrink-0">
+                        Admin
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Pinned Ultra-Compact Bottom User & Utilities Footer (Only 48px height) */}
+        <div className="p-2 border-t border-neutral-800 bg-neutral-950 flex items-center justify-between gap-1.5 shrink-0 select-none">
           {/* User Account / Auth Section */}
           {user ? (
             <button
@@ -1047,21 +1348,15 @@ export function Sidebar({
                 onOpenProfile();
                 onClose();
               }}
-              className="w-full p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-left transition-colors flex items-center justify-between group"
+              className="flex-1 min-w-0 flex items-center gap-2 p-1.5 rounded-lg hover:bg-neutral-900 transition-colors text-left"
+              title={`Account: ${profile?.displayName || user.email}`}
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center font-bold text-[11px] shrink-0 uppercase">
-                  {user.email?.[0] || 'U'}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-white truncate">
-                    {profile?.displayName || user.displayName || user.email?.split('@')[0]}
-                  </div>
-                  <div className="text-[10px] text-neutral-400 truncate">
-                    {user.email}
-                  </div>
-                </div>
+              <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center justify-center font-bold text-[11px] shrink-0 uppercase">
+                {user.email?.[0] || 'U'}
               </div>
+              <span className="text-xs font-semibold text-neutral-200 truncate">
+                {profile?.displayName || user.displayName || user.email?.split('@')[0]}
+              </span>
             </button>
           ) : (
             <button
@@ -1071,33 +1366,23 @@ export function Sidebar({
                 onOpenAuth();
                 onClose();
               }}
-              className="w-full py-2 px-3 rounded-lg bg-neutral-800 hover:bg-neutral-750 text-white font-medium text-xs flex items-center justify-center gap-2 transition-colors border border-neutral-700/60"
+              className="flex-1 py-1.5 px-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-850 text-neutral-200 border border-neutral-800 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
             >
               <LogIn className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sign In / Sign Up</span>
+              <span>Sign In</span>
             </button>
           )}
 
-          {/* Theme, Settings & Keyboard Shortcuts Quick Actions */}
-          <div className="grid grid-cols-3 gap-1.5">
+          {/* Quick Settings, Theme & Shortcuts Icons */}
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               id="sidebar-theme-toggle-btn"
               type="button"
               onClick={toggleTheme}
-              className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white transition-colors flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
-              title={`Theme: ${resolvedTheme === 'dark' ? 'Dark' : 'Light'} (${themeMode === 'system' ? 'Auto OS' : 'Manual'}). Click to switch.`}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors"
+              title={resolvedTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {resolvedTheme === 'dark' ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="truncate">Light</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-purple-400" />
-                  <span className="truncate">Dark</span>
-                </>
-              )}
+              {resolvedTheme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-purple-400" />}
             </button>
 
             <button
@@ -1107,14 +1392,13 @@ export function Sidebar({
                 onOpenSettings();
                 onClose();
               }}
-              className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white transition-colors flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
-              title="Open Settings & Theme Preferences"
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors"
+              title="Open Settings"
             >
-              <Sliders className="w-3.5 h-3.5 text-amber-400" />
-              <span className="truncate">Settings</span>
+              <Sliders className="w-3.5 h-3.5" />
             </button>
 
-            {onOpenShortcuts ? (
+            {onOpenShortcuts && (
               <button
                 id="sidebar-shortcuts-btn"
                 type="button"
@@ -1122,55 +1406,15 @@ export function Sidebar({
                   onOpenShortcuts();
                   onClose();
                 }}
-                className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-amber-300 transition-colors flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
-                title="Keyboard Shortcuts Productivity Help (?)"
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-amber-300 hover:bg-neutral-900 transition-colors font-mono font-bold text-xs"
+                title="Keyboard shortcuts (?)"
               >
-                <Keyboard className="w-3.5 h-3.5 text-amber-400" />
-                <span className="truncate">Keys (?)</span>
-              </button>
-            ) : (
-              <button
-                id="sidebar-shortcuts-placeholder-btn"
-                type="button"
-                onClick={() => {
-                  onOpenSettings();
-                  onClose();
-                }}
-                className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-amber-300 transition-colors flex flex-col items-center justify-center gap-1 text-[11px] font-medium"
-              >
-                <Palette className="w-3.5 h-3.5 text-amber-400" />
-                <span className="truncate">Theme</span>
+                <span className="w-4 h-4 rounded-full border border-neutral-700 flex items-center justify-center text-[10px] leading-none">
+                  ?
+                </span>
               </button>
             )}
           </div>
-
-          {/* Browser Extension Button */}
-          <button
-            id="sidebar-extension-btn"
-            type="button"
-            onClick={() => {
-              onOpenExtension();
-              onClose();
-            }}
-            className="w-full p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 text-left transition-colors flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2">
-              <div className="p-1 rounded bg-amber-500/10 text-amber-400">
-                <Chrome className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <div className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors">
-                  Browser Extension
-                </div>
-                <div className="text-[10px] text-neutral-400">
-                  Chrome, Edge & Brave (.ZIP)
-                </div>
-              </div>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 font-medium">
-              V3
-            </span>
-          </button>
         </div>
       </aside>
 

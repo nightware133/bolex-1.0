@@ -14,11 +14,15 @@ import {
   Palette,
   Users,
   Chrome,
-  Crown
+  Crown,
+  Anchor,
+  BrainCircuit,
+  Share2,
+  Zap
 } from 'lucide-react';
 
 interface ShortcutItem {
-  id: string;
+  id?: string;
   category: 'chat' | 'tools' | 'audio' | 'general';
   title: string;
   description: string;
@@ -29,7 +33,6 @@ interface ShortcutItem {
 const SHORTCUTS: ShortcutItem[] = [
   // Chat & Navigation
   {
-    id: 'send-message',
     category: 'chat',
     title: 'Send Message',
     description: 'Submit your prompt or question to the AI model',
@@ -37,7 +40,6 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: MessageSquare,
   },
   {
-    id: 'newline',
     category: 'chat',
     title: 'New Line in Input',
     description: 'Insert a line break without sending the message',
@@ -45,7 +47,6 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: MessageSquare,
   },
   {
-    id: 'new-chat',
     category: 'chat',
     title: 'Start New Conversation',
     description: 'Create a fresh chat session and focus the input',
@@ -53,7 +54,6 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Sparkles,
   },
   {
-    id: 'toggle-sidebar',
     category: 'chat',
     title: 'Toggle Sidebar',
     description: 'Show or hide the chat history and folder drawer',
@@ -61,7 +61,6 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: MessageSquare,
   },
   {
-    id: 'shortcuts-modal',
     category: 'chat',
     title: 'Keyboard Shortcuts Help',
     description: 'Show this keyboard productivity cheat sheet',
@@ -69,7 +68,6 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Keyboard,
   },
   {
-    id: 'close-modal',
     category: 'chat',
     title: 'Close Modal / Cancel',
     description: 'Dismiss any open dialog or active microphone dictation',
@@ -79,7 +77,27 @@ const SHORTCUTS: ShortcutItem[] = [
 
   // Tools & Intelligence
   {
-    id: 'open-map',
+    category: 'tools',
+    title: 'Contextual Anchors & Vault',
+    description: 'Open Project Memory Vault to manage persistent docs & schemas',
+    keys: ['⌘/Ctrl', 'Shift', 'V'],
+    icon: Anchor,
+  },
+  {
+    category: 'tools',
+    title: 'Toggle Cognitive Trace',
+    description: 'Turn raw step-by-step reasoning monologue ON or OFF',
+    keys: ['⌘/Ctrl', 'Shift', 'R'],
+    icon: BrainCircuit,
+  },
+  {
+    category: 'tools',
+    title: 'Quantum Hyper-Reasoning',
+    description: 'Toggle multi-branch hypothesis evaluation & consensus synthesis',
+    keys: ['⌘/Ctrl', 'Shift', 'Q'],
+    icon: Zap,
+  },
+  {
     category: 'tools',
     title: 'Open Map Studio',
     description: 'Launch the AI Concept Graph & Geographic Explorer',
@@ -87,7 +105,6 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Compass,
   },
   {
-    id: 'toggle-search',
     category: 'tools',
     title: 'Toggle Web Search',
     description: 'Turn Google Web Search Grounding ON or OFF',
@@ -155,10 +172,26 @@ const SHORTCUTS: ShortcutItem[] = [
   {
     id: 'toggle-theme',
     category: 'general',
-    title: 'Toggle Dark / Light Theme',
-    description: 'Quickly switch between dark and light color modes',
+    title: 'Toggle Theme (Dark Mode Recommended)',
+    description: 'Switch color modes (Dark mode is normal; Light mode is not recommended)',
     keys: ['⌘/Ctrl', 'Shift', 'T'],
     icon: Palette,
+  },
+  {
+    id: 'open-share-link',
+    category: 'general',
+    title: 'Real App Link & QR Code',
+    description: 'View the live web address and share with friends',
+    keys: ['⌘/Ctrl', 'Shift', 'L'],
+    icon: Share2,
+  },
+  {
+    id: 'open-founder-console',
+    category: 'tools',
+    title: 'Founder Admin Console',
+    description: 'Giveaways, broadcasts and license keys (Tayden Simon)',
+    keys: ['⌘/Ctrl', 'Shift', 'A'],
+    icon: Crown,
   },
 ];
 

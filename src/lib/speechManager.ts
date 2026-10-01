@@ -50,7 +50,20 @@ class SpeechManager {
 
   public subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
-    listener(this.state);
+    // Queue callback to avoid synchronous React 19 concurrent state updates during render
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(() => {
+        if (this.listeners.has(listener)) {
+          listener(this.state);
+        }
+      });
+    } else {
+      setTimeout(() => {
+        if (this.listeners.has(listener)) {
+          listener(this.state);
+        }
+      }, 0);
+    }
     return () => {
       this.listeners.delete(listener);
     };
@@ -127,7 +140,11 @@ class SpeechManager {
 
   public getVoices(): SpeechSynthesisVoice[] {
     if (!this.isSupported()) return [];
-    return window.speechSynthesis.getVoices();
+    try {
+      return window.speechSynthesis.getVoices() || [];
+    } catch {
+      return [];
+    }
   }
 
   public speak(messageId: string, rawText: string, customRate?: number) {

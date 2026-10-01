@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Bolex AI - Browser Assistant",
-  "version": "1.0.0",
-  "description": "Instant browser assistant powered by Bolex AI.",
+  "name": "Bolex AI - Browser Assistant & Workspace",
+  "version": "2.0.0",
+  "description": "Next-generation browser assistant powered by Bolex AI. Web search grounding, page summarization, vision analysis, and contextual side panel.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -10,7 +10,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Bolex AI"
+    "default_title": "Bolex AI Assistant (Ctrl+Shift+B)"
   },
   "background": {
     "service_worker": "background.js"
@@ -23,12 +23,23 @@
       "suggested_key": {
         "default": "Ctrl+Shift+B",
         "mac": "Command+Shift+B"
-      }
+      },
+      "description": "Open Bolex AI Assistant"
+    },
+    "open_side_panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
+      },
+      "description": "Toggle Bolex AI Side Panel"
     }
   },
   "permissions": [
     "storage",
-    "sidePanel"
+    "sidePanel",
+    "activeTab",
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://*/*",

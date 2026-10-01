@@ -137,7 +137,12 @@ export function TokenIndicator({
       {isUnlimited ? (
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
-            {tier === 'ultra' ? (
+            {tier === 'quantum' ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 font-semibold text-[11px] shadow-xs">
+                <Zap className="w-3 h-3 text-cyan-400 fill-cyan-400/20" />
+                <span>Bolex Quantum Apex</span>
+              </span>
+            ) : tier === 'ultra' ? (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-300 font-semibold text-[11px]">
                 <Flame className="w-3 h-3 text-purple-400" />
                 <span>Bolex Ultra VIP</span>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeMode = 'system' | 'dark' | 'light';
+export type ThemeMode = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
 
 const THEME_STORAGE_KEY = 'bolex_theme_mode';
@@ -11,6 +11,8 @@ interface ThemeContextType {
   setThemeMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
   systemPreference: ResolvedTheme;
+  showLightWarning: boolean;
+  dismissLightWarning: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -32,10 +34,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    return 'system';
+    // Default to dark mode for normal obsidian aesthetic and optimal eye comfort
+    return 'dark';
   });
 
   const [systemPreference, setSystemPreference] = useState<ResolvedTheme>(() => getSystemThemePreference());
+  const [showLightWarning, setShowLightWarning] = useState<boolean>(false);
 
   const resolvedTheme: ResolvedTheme = themeMode === 'system' ? systemPreference : themeMode;
 
@@ -87,6 +91,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setThemeMode = (mode: ThemeMode) => {
     setThemeModeState(mode);
+    if (mode === 'light' || (mode === 'system' && systemPreference === 'light')) {
+      setShowLightWarning(true);
+    } else {
+      setShowLightWarning(false);
+    }
     try {
       localStorage.setItem(THEME_STORAGE_KEY, mode);
     } catch {
@@ -102,6 +111,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const dismissLightWarning = () => {
+    setShowLightWarning(false);
+  };
+
   return (
     <ThemeContext.Provider
       value={{
@@ -110,6 +123,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setThemeMode,
         toggleTheme,
         systemPreference,
+        showLightWarning,
+        dismissLightWarning,
       }}
     >
       {children}

@@ -3,26 +3,59 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bolex AI - Assistant</title>
+    <title>Bolex AI - Browser Assistant</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <div class="app-container">
-      <!-- Top Navigation -->
+      <!-- Top Navigation Header -->
       <header class="app-header">
         <div class="brand">
           <div class="brand-icon">⚡</div>
           <div class="brand-text">
-            <span class="brand-title">Bolex</span>
-            <span class="brand-badge">Assistant</span>
+            <span class="brand-title">Bolex AI</span>
+            <span class="brand-badge" id="activeModeBadge">Turbo</span>
           </div>
         </div>
+
         <div class="header-actions">
+          <!-- Web Search Grounding Toggle -->
+          <button id="toggleSearchBtn" class="icon-btn tool-toggle" title="Toggle Live Web Search Grounding">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <span class="toggle-dot" id="searchDot"></span>
+          </button>
+
+          <!-- Summarize Page Button -->
+          <button id="summarizePageBtn" class="icon-btn" title="Analyze & Summarize Current Webpage">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </button>
+
+          <!-- Settings Button -->
+          <button id="settingsBtn" class="icon-btn" title="Extension Settings & Backend Host">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+
+          <!-- Clear Chat -->
           <button id="clearChatBtn" class="icon-btn" title="Clear conversation">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
             </svg>
           </button>
+
+          <!-- Open Full App Link -->
           <a id="openFullAppBtn" class="icon-btn" target="_blank" href="https://ais-pre-cge2tjdimpisaqembh3jzh-693311015224.us-west2.run.app" title="Open Bolex Full Workspace">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -33,44 +66,144 @@
         </div>
       </header>
 
+      <!-- Settings Panel (Collapsible Overlay) -->
+      <div id="settingsPanel" class="settings-panel hidden">
+        <div class="settings-header">
+          <span class="settings-title">⚙️ Bolex Settings</span>
+          <button id="closeSettingsBtn" class="close-panel-btn">&times;</button>
+        </div>
+        <div class="settings-body">
+          <label class="setting-label">
+            <span>Backend Server Host URL:</span>
+            <input type="text" id="backendHostInput" placeholder="https://ais-pre-cge2tjdimpisaqembh3jzh-693311015224.us-west2.run.app" />
+          </label>
+          <div class="settings-actions">
+            <button id="testConnectionBtn" class="btn-secondary">Test Connection</button>
+            <button id="saveHostBtn" class="btn-primary">Save Host</button>
+          </div>
+          <div id="connectionFeedback" class="connection-feedback"></div>
+
+          <label class="setting-label mt-2">
+            <span>AI Model Architecture Version:</span>
+            <select id="modelVersionSelect">
+              <option value="bolex-4.0" selected>⚡ Bolex 4.0 Omni (Flagship &amp; Vision)</option>
+              <option value="bolex-3.8">⚡ Bolex 3.8 Turbo (Fast &amp; Balanced)</option>
+              <option value="bolex-2.0">🚀 Bolex 2.0 Flash (Instant Low-Latency)</option>
+              <option value="bolex-o1">🧠 Bolex o1 Deep Reasoner (Extended Reasoning)</option>
+            </select>
+          </label>
+
+          <label class="setting-label mt-2">
+            <span>AI Persona / Specialization:</span>
+            <select id="personaSelect">
+              <option value="general">⚡ Bolex Turbo (Balanced Assistant)</option>
+              <option value="developer">💻 Senior Full-Stack Engineer</option>
+              <option value="analyst">📊 Research & Data Analyst</option>
+              <option value="creative">✍️ Creative Copywriter & Editor</option>
+              <option value="concise">🎯 Ultra-Concise Executive Bulleted</option>
+            </select>
+          </label>
+
+          <label class="setting-label mt-2">
+            <span>AI Temperature:</span>
+            <div class="slider-wrapper">
+              <input type="range" id="temperatureSlider" min="0" max="1.5" step="0.1" value="0.7" />
+              <span id="tempValue" class="temp-val">0.7</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Quick Action Pill Bar -->
+      <div class="quick-action-bar">
+        <button class="quick-action-pill" id="pillSummarizePage">
+          <span class="pill-icon">📄</span> Summarize Tab
+        </button>
+        <button class="quick-action-pill" id="pillExplainCode">
+          <span class="pill-icon">💻</span> Explain Code
+        </button>
+        <button class="quick-action-pill" id="pillPromptStudio">
+          <span class="pill-icon">✨</span> Prompt Studio
+        </button>
+        <button class="quick-action-pill" id="pillConceptMap">
+          <span class="pill-icon">🗺️</span> Concept Map
+        </button>
+      </div>
+
       <!-- Chat Messages Scroll Area -->
       <div id="messagesContainer" class="messages-container">
         <div class="message system-welcome">
           <div class="welcome-header">
-            <strong>Bolex AI Active</strong>
+            <div class="welcome-badge">⚡ Bolex Workspace Active</div>
+            <span class="welcome-sub">Browser companion for research, coding, and vision analysis.</span>
           </div>
-          <p>I am your browser-side AI assistant. How can I assist you with your current task?</p>
+          <p class="welcome-desc">How can I assist your browsing session today?</p>
           <div class="quick-chips">
-            <button class="chip" data-prompt="Analyze the key factors and provide a structured summary.">📊 Analysis</button>
-            <button class="chip" data-prompt="Help me review and debug this logic or code.">🔍 Debug Code</button>
-            <button class="chip" data-prompt="Help me draft a clear, professional summary.">✍️ Draft Summary</button>
+            <button class="chip" data-prompt="Analyze the active webpage and summarize its core insights with key takeaways.">📊 Summarize Page</button>
+            <button class="chip" data-prompt="Help me review and debug this code logic with best practices.">🔍 Debug Code</button>
+            <button class="chip" data-prompt="Draft a high-impact executive summary and action items.">✍️ Draft Summary</button>
+            <button class="chip" data-prompt="Create a concept mindmap breakdown of this topic.">🗺️ Mindmap Plan</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Image Attachment Preview Bar (hidden until file attached) -->
+      <div id="imagePreviewBar" class="image-preview-bar hidden">
+        <div class="preview-thumb-wrapper">
+          <img id="imagePreviewImg" src="" alt="Attached image preview" />
+          <button id="removeImageBtn" class="remove-img-btn" title="Remove image">&times;</button>
+        </div>
+        <div class="image-meta">
+          <span id="imageFileName" class="img-filename">image.png</span>
+          <span class="img-tip">Ready for Vision OCR &amp; analysis</span>
         </div>
       </div>
 
       <!-- Input Area -->
       <footer class="input-area">
         <div class="input-wrapper">
+          <!-- Hidden file input for images -->
+          <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp" style="display: none;" />
+          
+          <!-- Image Attach Button -->
+          <button id="attachImageBtn" class="input-tool-btn" title="Attach image or paste screenshot">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </button>
+
+          <!-- Textarea Input -->
           <textarea
             id="chatInput"
             rows="1"
             placeholder="Ask Bolex anything... (Shift+Enter for newline)"
           ></textarea>
+
+          <!-- Send / Stop Button -->
           <button id="sendBtn" class="send-btn" title="Send message">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg id="sendIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
             </svg>
+            <svg id="stopIcon" class="hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+            </svg>
           </button>
         </div>
+
         <div class="input-meta">
-          <span>Enter to send &bull; Shift+Enter for new line</span>
-          <span id="serverStatus" class="status-badge connected">Connected</span>
+          <div class="meta-left">
+            <span id="searchIndicator" class="search-status-tag hidden">🌐 Search ON</span>
+            <span id="personaTag" class="persona-tag">⚡ Turbo</span>
+          </div>
+          <div class="meta-right">
+            <span id="serverStatus" class="status-badge connected">Connected</span>
+          </div>
         </div>
       </footer>
     </div>
 
-    <!-- External script, zero inline script to strictly follow MV3 CSP -->
+    <!-- External script, strictly compliant with MV3 CSP -->
     <script src="popup.js"></script>
   </body>
 </html>

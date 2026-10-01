@@ -6,19 +6,19 @@ import {
   X, 
   Square,
   Mic,
-  MicOff,
   Sparkles,
-  Crown,
-  AlertCircle,
   Wand2,
   CheckCircle2,
   Copy,
-  Layers
+  BrainCircuit,
+  Anchor,
+  Plus,
+  Lock
 } from 'lucide-react';
-import { ImageAttachment } from '../types';
+import { ImageAttachment, ContextualAnchor } from '../types';
+import { AI_MODELS } from '../constants';
 import { useAuth } from '../context/AuthContext';
-import { TokenIndicator } from './TokenIndicator';
-import { Flame } from 'lucide-react';
+import { findMatchingAnchors } from '../lib/anchors';
 
 interface ChatInputProps {
   onSendMessage: (text: string, image?: ImageAttachment) => void;
@@ -26,10 +26,18 @@ interface ChatInputProps {
   isLoading: boolean;
   enableSearch: boolean;
   onToggleSearch: () => void;
+  enableCognitiveTrace?: boolean;
+  onToggleCognitiveTrace?: () => void;
+  enableQuantumReasoning?: boolean;
+  onToggleQuantumReasoning?: () => void;
+  anchors?: ContextualAnchor[];
+  onOpenAnchors?: () => void;
   disabled?: boolean;
   onOpenBolexPlus?: () => void;
   onOpenShortcuts?: () => void;
   sessionTokens?: number;
+  selectedModelVersion?: string;
+  onSelectModelVersion?: (modelId: string) => void;
 }
 
 export function ChatInput({
@@ -38,12 +46,20 @@ export function ChatInput({
   isLoading,
   enableSearch,
   onToggleSearch,
+  enableCognitiveTrace = true,
+  onToggleCognitiveTrace,
+  enableQuantumReasoning = false,
+  onToggleQuantumReasoning,
+  anchors = [],
+  onOpenAnchors,
   disabled,
   onOpenBolexPlus,
-  onOpenShortcuts,
   sessionTokens = 0,
+  selectedModelVersion = 'bolex-4.0',
+  onSelectModelVersion,
 }: ChatInputProps) {
   const [inputText, setInputText] = useState('');
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [attachedImage, setAttachedImage] = useState<ImageAttachment | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -61,15 +77,9 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
-  const isListeningRef = useRef(false);
-  const isContinuousRef = useRef(false);
 
-  const { effectiveTier, isTrialActive, trialRemainingText } = useAuth();
-  const isPlusOrUltra = effectiveTier === 'plus' || effectiveTier === 'ultra' || effectiveTier === 'quantum';
+  const { effectiveTier, isTrialActive } = useAuth();
   const isLimitReached = effectiveTier === 'free' && !isTrialActive && sessionTokens >= 60;
-
-  isListeningRef.current = isListening;
-  isContinuousRef.current = isPlusOrUltra;
 
   // Cleanup speech recognition on unmount
   useEffect(() => {
@@ -85,7 +95,6 @@ export function ChatInput({
   }, []);
 
   const stopListening = () => {
-    isListeningRef.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -104,7 +113,6 @@ export function ChatInput({
       return;
     }
 
-    // Check browser support for Web Speech API
     const SpeechRecognitionConstructor = 
       (typeof window !== 'undefined' &&
         ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) ||
@@ -124,7 +132,6 @@ export function ChatInput({
 
       recognition.onstart = () => {
         setIsListening(true);
-        isListeningRef.current = true;
         setSpeechError(null);
         setInterimTranscript('');
       };
@@ -143,142 +150,49 @@ export function ChatInput({
         }
 
         if (finalChunk) {
-          setInputText((prev) => {
-            const needsSpace = prev.length > 0 && !prev.endsWith(' ') && !prev.endsWith('\n');
-            const updated = prev + (needsSpace ? ' ' : '') + finalChunk.trim();
-            // Automatically adjust textarea height to fit content
-            setTimeout(() => {
-              if (textareaRef.current) {
-                textareaRef.current.style.height = 'auto';
-                textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
-              }
-            }, 0);
-            return updated;
-          });
+          setInputText((prev) => (prev ? `${prev} ${finalChunk.trim()}` : finalChunk.trim()));
           setInterimTranscript('');
         } else {
           setInterimTranscript(interimChunk);
         }
       };
 
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error event:', event.error);
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          setSpeechError('Microphone permission denied. Please allow microphone access in your browser settings.');
-          setIsListening(false);
-          isListeningRef.current = false;
-        } else if (event.error === 'no-speech') {
-          // In standard mode, if no speech detected for a while, keep listening or finish
-          if (!isContinuousRef.current) {
-            // Keep status without error
-          }
-        } else if (event.error !== 'aborted') {
-          setSpeechError(`Voice dictation issue: ${event.error}`);
-          setIsListening(false);
-          isListeningRef.current = false;
+      recognition.onerror = (e: any) => {
+        if (e.error !== 'no-speech') {
+          setSpeechError(`Microphone notice: ${e.error || 'Check browser permissions'}`);
         }
+        stopListening();
       };
 
       recognition.onend = () => {
-        // If Bolex Plus continuous perk is active and not explicitly stopped, restart recognition
-        if (isListeningRef.current && isContinuousRef.current) {
-          try {
-            recognition.start();
-            return;
-          } catch {
-            // ignore
-          }
-        }
         setIsListening(false);
-        isListeningRef.current = false;
         setInterimTranscript('');
       };
 
       recognitionRef.current = recognition;
       recognition.start();
-    } catch (err: any) {
-      console.error('Failed to initialize speech recognition:', err);
-      setSpeechError(err?.message || 'Failed to start microphone dictation.');
-      setIsListening(false);
-      isListeningRef.current = false;
-    }
-  };
-
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (!result) return;
-      const base64Data = result.split(',')[1];
-      setAttachedImage({
-        data: base64Data,
-        mimeType: file.type,
-        previewUrl: result,
-        name: file.name,
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
-    e.target.value = '';
-  };
-
-  const handleOptimizePrompt = async () => {
-    const raw = inputText.trim() || 'Create a comprehensive, expert-level strategic blueprint with clear execution milestones and risk mitigations.';
-    setIsOptimizingPrompt(true);
-    try {
-      const res = await fetch('/api/prompt/optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawPrompt: raw }),
-      });
-      const data = await res.json();
-      if (data.ok && data.data?.optimizedPrompt) {
-        setOptimizedPreview({
-          optimizedPrompt: data.data.optimizedPrompt,
-          enhancements: data.data.enhancements || ['Expert role formulation', 'Structured deliverables', 'Negative constraints'],
-          estimatedQualityBoost: data.data.estimatedQualityBoost || '+140%',
-        });
-      } else {
-        // Fallback local enhancer if offline
-        const localEnhanced = `Act as a senior domain expert and principal advisor.\n\n### Objective\n${raw}\n\n### Requirements & Deliverables\n1. Provide a step-by-step breakdown with actionable takeaways.\n2. Detail edge cases, trade-offs, and critical security/quality constraints.\n3. Include a clean example or summary diagram.\n\nDeliver the analysis in clear, polished Markdown format.`;
-        setOptimizedPreview({
-          optimizedPrompt: localEnhanced,
-          enhancements: ['Persona & context framing', 'Structured deliverables schema', 'Edge case & quality guardrails'],
-          estimatedQualityBoost: '+120%',
-        });
-      }
     } catch {
-      const localEnhanced = `Act as a senior domain expert and principal advisor.\n\n### Objective\n${raw}\n\n### Requirements & Deliverables\n1. Provide a step-by-step breakdown with actionable takeaways.\n2. Detail edge cases, trade-offs, and critical security/quality constraints.\n3. Include a clean example or summary diagram.\n\nDeliver the analysis in clear, polished Markdown format.`;
-      setOptimizedPreview({
-        optimizedPrompt: localEnhanced,
-        enhancements: ['Persona & context framing', 'Structured deliverables schema', 'Edge case guardrails'],
-        estimatedQualityBoost: '+120%',
-      });
-    } finally {
-      setIsOptimizingPrompt(false);
+      setSpeechError('Microphone permission denied or unavailable.');
+      setIsListening(false);
     }
   };
 
-  const handleApplyOptimized = () => {
-    if (!optimizedPreview) return;
-    setInputText(optimizedPreview.optimizedPrompt);
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if ((!inputText.trim() && !attachedImage) || isLoading || disabled || isLimitReached) return;
+
+    if (isListening) {
+      stopListening();
+    }
+
+    onSendMessage(inputText.trim(), attachedImage || undefined);
+    setInputText('');
+    setAttachedImage(null);
     setOptimizedPreview(null);
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
-        textareaRef.current.focus();
-      }
-    }, 0);
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -288,204 +202,223 @@ export function ChatInput({
     }
   };
 
-  const handleSubmit = () => {
-    const trimmed = inputText.trim();
-    if ((!trimmed && !attachedImage) || isLoading || disabled) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload a valid image file (PNG, JPEG, WebP, GIF).');
       return;
     }
-    
-    // Stop voice dictation if active
-    if (isListening) {
-      stopListening();
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        const commaIndex = result.indexOf(',');
+        const base64Data = commaIndex !== -1 ? result.slice(commaIndex + 1) : result;
+
+        setAttachedImage({
+          mimeType: file.type,
+          data: base64Data,
+          previewUrl: result,
+          name: file.name,
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleOptimizePrompt = async () => {
+    if (!inputText.trim() || isOptimizingPrompt) return;
+    setIsOptimizingPrompt(true);
+    try {
+      const res = await fetch('/api/prompt/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawPrompt: inputText.trim(),
+          style: 'masterpiece',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && data.data) {
+          setOptimizedPreview(data.data);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsOptimizingPrompt(false);
     }
+  };
 
-    onSendMessage(trimmed, attachedImage || undefined);
-    setInputText('');
-    setAttachedImage(null);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+  const handleApplyOptimized = () => {
+    if (optimizedPreview?.optimizedPrompt) {
+      setInputText(optimizedPreview.optimizedPrompt);
+      setOptimizedPreview(null);
+      if (textareaRef.current) {
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+            textareaRef.current.focus();
+          }
+        }, 50);
+      }
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
-  };
+  const matchedAnchors = inputText.trim() ? findMatchingAnchors(anchors, inputText, false) : [];
 
   return (
-    <div className="p-3 sm:p-4 bg-neutral-900/80 border-t border-neutral-800 backdrop-blur-md">
-      <div className="max-w-3xl mx-auto space-y-2">
-        {/* Token limit or warning banner */}
-        <TokenIndicator
-          tokens={sessionTokens}
-          tier={effectiveTier}
-          isTrialActive={isTrialActive}
-          trialRemainingText={trialRemainingText}
-          onOpenUpgradeModal={onOpenBolexPlus || (() => {})}
-          variant="banner"
-        />
-
-        {/* Drag overlay state */}
+    <div className="w-full bg-gradient-to-t from-neutral-950 via-neutral-950/90 to-transparent pt-4 pb-3 px-3 sm:px-4">
+      <div className="max-w-3xl mx-auto flex flex-col items-center space-y-2">
+        {/* Floating Input Pill Box */}
         <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`relative rounded-xl border bg-neutral-950 transition-all overflow-hidden ${
-            isDragging
-              ? 'border-amber-400/80 bg-neutral-900/90 ring-2 ring-amber-400/30'
-              : isListening
-              ? 'border-rose-500/60 ring-1 ring-rose-500/30'
-              : isLimitReached
-              ? 'border-rose-700/70 focus-within:border-rose-500 ring-1 ring-rose-500/20'
-              : 'border-neutral-800 focus-within:border-neutral-700 focus-within:ring-1 focus-within:ring-amber-500/20'
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file && file.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const result = event.target?.result as string;
+                if (result) {
+                  const commaIndex = result.indexOf(',');
+                  const base64Data = commaIndex !== -1 ? result.slice(commaIndex + 1) : result;
+                  setAttachedImage({
+                    mimeType: file.type,
+                    data: base64Data,
+                    previewUrl: result,
+                    name: file.name,
+                  });
+                }
+              };
+              reader.readAsDataURL(file);
+            }
+          }}
+          className={`w-full rounded-3xl bg-neutral-900/90 border transition-all shadow-2xl backdrop-blur-md overflow-hidden ${
+            isDragging 
+              ? 'border-amber-400 bg-amber-500/10' 
+              : 'border-neutral-700/70 focus-within:border-neutral-500'
           }`}
         >
-          {/* Active Voice Dictation Banner */}
+          {/* Active Voice Listening Banner */}
           {isListening && (
-            <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-gradient-to-r from-rose-950/60 via-neutral-950 to-neutral-950 border-b border-rose-500/30 text-rose-300 text-xs">
+            <div className="flex items-center justify-between gap-2 px-4 py-2 bg-rose-500/15 border-b border-rose-500/30 text-rose-200 text-xs animate-pulse">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
-                </span>
-                <span className="font-semibold text-rose-200 shrink-0">
-                  {effectiveTier === 'ultra' ? 'Bolex Ultra VIP Continuous Dictation' : effectiveTier === 'plus' ? 'Bolex Plus Pro Dictation' : 'Listening with Web Speech...'}
-                </span>
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                <span className="font-semibold text-rose-300">Listening...</span>
                 {interimTranscript && (
-                  <span className="text-neutral-400 truncate italic max-w-[280px]">
-                    "{interimTranscript}"
-                  </span>
+                  <span className="text-neutral-300 italic truncate max-w-xs">"{interimTranscript}"</span>
                 )}
               </div>
               <button 
                 type="button" 
                 onClick={stopListening}
-                className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[11px] font-medium transition-colors shrink-0"
+                className="px-2 py-0.5 rounded bg-rose-500/30 text-rose-200 text-[11px] font-medium"
               >
-                Stop Mic
+                Stop
               </button>
             </div>
           )}
 
-          {/* Speech Error Banner */}
-          {speechError && (
-            <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-xs">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                <span className="truncate">{speechError}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSpeechError(null)}
-                className="text-neutral-400 hover:text-white text-[11px] underline shrink-0 ml-2"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-
-          {/* Attached image preview */}
+          {/* Attached Image Preview */}
           {attachedImage && (
-            <div className="p-2.5 pb-0 flex items-center gap-2">
-              <div className="relative group inline-block">
+            <div className="px-4 pt-3 pb-1 flex items-center gap-2.5">
+              <div className="relative inline-block">
                 <img
                   src={attachedImage.previewUrl}
-                  alt="Attachment preview"
-                  className="w-14 h-14 object-cover rounded-lg border border-neutral-700 bg-neutral-900"
+                  alt="Attachment"
+                  className="w-14 h-14 object-cover rounded-xl border border-neutral-700 bg-neutral-950 shadow-md"
                 />
                 <button
-                  id="remove-attachment-btn"
                   type="button"
                   onClick={() => setAttachedImage(null)}
-                  className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-700 hover:bg-neutral-800 transition-colors"
+                  className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-neutral-900 text-neutral-300 hover:text-white border border-neutral-700 hover:bg-neutral-800"
                   title="Remove image"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="text-xs text-neutral-400 truncate max-w-[200px]">
-                <p className="font-medium text-neutral-300 truncate">{attachedImage.name || 'Image'}</p>
-                <p className="text-[11px] text-emerald-400">Attached for vision reasoning</p>
+              <div className="text-xs">
+                <p className="font-medium text-neutral-200 truncate max-w-[220px]">{attachedImage.name || 'Image'}</p>
+                <p className="text-[11px] text-amber-400">Ready for vision analysis</p>
               </div>
             </div>
           )}
 
-          {/* AI Magic Prompt Preview Card */}
+          {/* Prompt Studio Preview */}
           {optimizedPreview && (
-            <div className="m-2.5 p-3 rounded-xl bg-neutral-900/95 border border-amber-500/40 shadow-xl space-y-2 animate-in fade-in duration-200 text-xs">
+            <div className="m-3 p-3 rounded-2xl bg-neutral-950 border border-amber-500/40 text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-bold text-amber-400">
                   <Wand2 className="w-3.5 h-3.5" />
-                  <span>Bolex Prompt Studio Enhanced</span>
+                  <span>Prompt Studio Enhanced</span>
                   {optimizedPreview.estimatedQualityBoost && (
                     <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono">
-                      {optimizedPreview.estimatedQualityBoost} precision
+                      {optimizedPreview.estimatedQualityBoost}
                     </span>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={() => setOptimizedPreview(null)}
-                  className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-800"
-                  title="Close enhancer preview"
+                  className="p-1 text-neutral-400 hover:text-white"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-
-              <div className="max-h-36 overflow-y-auto p-2 rounded-lg bg-neutral-950 border border-neutral-800 text-neutral-200 font-mono text-[11px] whitespace-pre-wrap leading-relaxed select-text">
+              <div className="max-h-28 overflow-y-auto p-2 rounded-lg bg-neutral-900 font-mono text-[11px] text-neutral-200 whitespace-pre-wrap">
                 {optimizedPreview.optimizedPrompt}
               </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {optimizedPreview.enhancements.map((enh, i) => (
-                    <span key={i} className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300">
-                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
-                      {enh}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(optimizedPreview.optimizedPrompt);
-                    }}
-                    className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-750 text-neutral-300 hover:text-white text-[11px] font-medium transition-colors flex items-center gap-1"
-                    title="Copy to clipboard"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleApplyOptimized}
-                    className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                  >
-                    <Wand2 className="w-3 h-3" />
-                    <span>Apply to Chat</span>
-                  </button>
-                </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(optimizedPreview.optimizedPrompt)}
+                  className="px-2.5 py-1 rounded-lg bg-neutral-850 hover:bg-neutral-800 text-neutral-300 text-xs flex items-center gap-1"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyOptimized}
+                  className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold flex items-center gap-1"
+                >
+                  <Wand2 className="w-3 h-3" />
+                  <span>Apply</span>
+                </button>
               </div>
             </div>
           )}
 
-          {/* Text Area */}
+          {/* Matched Anchors Bar */}
+          {matchedAnchors.length > 0 && (
+            <div className="mx-4 mt-2 px-3 py-1.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                <Anchor className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[11px] font-semibold text-amber-300">Memory Vault:</span>
+                {matchedAnchors.map(({ anchor }) => (
+                  <span key={anchor.id} className="px-2 py-0.5 rounded-full bg-neutral-900 border border-amber-500/30 text-[10px] text-neutral-200">
+                    {anchor.title}
+                  </span>
+                ))}
+              </div>
+              {onOpenAnchors && (
+                <button type="button" onClick={onOpenAnchors} className="text-[10px] text-amber-400 hover:underline">
+                  Vault
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Main Textarea */}
           <textarea
             id="chat-textarea"
             ref={textareaRef}
@@ -499,16 +432,15 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={
               isListening
-                ? 'Speaking... your speech will appear here in real-time.'
+                ? 'Listening to microphone...'
                 : attachedImage
-                ? 'Ask a question or provide instructions about this image...'
-                : 'Ask anything, dictate with your microphone, or brainstorm ideas...'
+                ? 'Ask anything about this image...'
+                : 'Message Bolex...'
             }
             disabled={disabled}
-            className="w-full px-3.5 pt-3 pb-2 bg-transparent text-sm sm:text-base text-neutral-100 placeholder-neutral-500 resize-none focus:outline-hidden leading-relaxed"
+            className="w-full px-4 pt-3.5 pb-2 bg-transparent text-sm sm:text-base text-neutral-100 placeholder-neutral-500 resize-none focus:outline-hidden leading-relaxed"
           />
 
-          {/* Hidden File Input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -517,173 +449,170 @@ export function ChatInput({
             className="hidden"
           />
 
-          {/* Bottom Toolbar inside the box */}
+          {/* Bottom Action Bar inside the Floating Pill */}
           <div className="px-3 pb-2.5 pt-1 flex items-center justify-between">
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Web Speech API Microphone Dictation Button */}
-              <button
-                id="voice-dictation-btn"
-                type="button"
-                onClick={toggleListening}
-                className={`p-1.5 rounded-lg transition-all flex items-center gap-1.5 text-xs ${
-                  isListening
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 ring-1 ring-rose-500/40 animate-pulse'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900 border border-transparent'
-                }`}
-                title={
-                  isListening 
-                    ? 'Click to stop voice dictation' 
-                    : 'Dictate message using your device microphone (Web Speech API)'
-                }
-              >
-                {isListening ? (
-                  <Mic className="w-4 h-4 text-rose-400 animate-bounce" />
-                ) : (
-                  <Mic className="w-4 h-4 text-neutral-400 group-hover:text-amber-400" />
-                )}
-                <span className="hidden sm:inline text-[11px] font-medium">
-                  {isListening ? 'Listening...' : 'Dictate'}
-                </span>
-              </button>
-
-              {/* Attach Image Button */}
+            {/* Left Quick Capability Pills */}
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+              {/* Attach Button */}
               <button
                 id="attach-image-btn"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900 transition-colors flex items-center gap-1 text-xs"
+                className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center justify-center cursor-pointer"
                 title="Attach an image for vision reasoning"
               >
-                <ImageIcon className="w-4 h-4" />
-                <span className="hidden sm:inline text-[11px]">Image</span>
+                <Plus className="w-4 h-4" />
               </button>
 
-              {/* Web Grounding Toggle */}
+              {/* Quick Model Selector Pill */}
+              <div className="relative">
+                <button
+                  id="input-model-selector-btn"
+                  type="button"
+                  onClick={() => setIsModelMenuOpen((prev) => !prev)}
+                  className="px-2 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1 border bg-neutral-850 hover:bg-neutral-800 text-neutral-200 border-neutral-700/80 cursor-pointer"
+                  title="Switch AI Model Version"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span className="text-[11px] font-bold">
+                    {AI_MODELS.find((m) => m.id === selectedModelVersion)?.versionNumber || '3.8'}
+                  </span>
+                </button>
+
+                {isModelMenuOpen && (
+                  <div className="absolute left-0 bottom-full mb-2 w-72 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/90 shadow-2xl p-1.5 z-50 text-xs space-y-1 animate-in fade-in zoom-in-95">
+                    <div className="px-2 py-1 text-[10.5px] font-medium text-neutral-400 border-b border-neutral-800 flex items-center justify-between">
+                      <span>Neural Model Tier</span>
+                      <span className="text-[10px] text-amber-400 font-mono">Bolex Engine</span>
+                    </div>
+                    {AI_MODELS.map((model) => {
+                      const isLocked = Boolean(model.isLockedForFree && effectiveTier === 'free' && !isTrialActive);
+                      const isSelected = (selectedModelVersion === model.id) || (!selectedModelVersion && model.id === 'bolex-3.8');
+
+                      return (
+                        <button
+                          key={model.id}
+                          type="button"
+                          onClick={() => {
+                            if (isLocked) {
+                              onOpenBolexPlus?.();
+                              setIsModelMenuOpen(false);
+                              return;
+                            }
+                            onSelectModelVersion?.(model.id);
+                            setIsModelMenuOpen(false);
+                          }}
+                          className={`w-full p-2 rounded-xl text-left transition-all flex items-center justify-between cursor-pointer ${
+                            isSelected
+                              ? 'bg-neutral-800 text-white font-semibold'
+                              : isLocked
+                              ? 'text-neutral-400 hover:bg-amber-950/20'
+                              : 'text-neutral-300 hover:bg-neutral-800/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold border ${model.tagColor}`}>
+                              {model.versionNumber}
+                            </span>
+                            <span className="truncate">{model.name}</span>
+                          </div>
+
+                          {isLocked ? (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center gap-0.5">
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>{model.requiredTier === 'ultra' ? 'ULTRA' : 'PLUS'}</span>
+                            </span>
+                          ) : isSelected ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Web Search Grounding Pill */}
               <button
                 id="input-web-search-toggle"
                 type="button"
                 onClick={onToggleSearch}
-                className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs ${
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border ${
                   enableSearch
-                    ? 'text-blue-400 bg-blue-500/10 border border-blue-500/30'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900 border border-transparent'
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-xs'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border-neutral-800'
                 }`}
                 title={enableSearch ? 'Google Search grounding is active' : 'Click to enable Google Search grounding'}
               >
-                <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline text-[11px]">
-                  {enableSearch ? 'Web Search ON' : 'Web Search OFF'}
-                </span>
+                <Globe className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Search</span>
               </button>
 
-              {/* AI Magic Prompt Enhancer / Optimizer Button */}
+              {/* Cognitive Trace / Reasoning Pill */}
+              {onToggleCognitiveTrace && (
+                <button
+                  id="input-cognitive-trace-toggle"
+                  type="button"
+                  onClick={onToggleCognitiveTrace}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                    enableCognitiveTrace
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-xs'
+                      : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border-neutral-800'
+                  }`}
+                  title={enableCognitiveTrace ? 'Cognitive Trace reasoning is ON' : 'Turn on Cognitive Trace'}
+                >
+                  <BrainCircuit className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Reason</span>
+                </button>
+              )}
+
+              {/* Prompt Studio Pill */}
               <button
                 id="input-magic-prompt-btn"
                 type="button"
                 onClick={handleOptimizePrompt}
-                disabled={isOptimizingPrompt}
-                className={`p-1.5 rounded-lg transition-all flex items-center gap-1 text-xs border ${
+                disabled={isOptimizingPrompt || !inputText.trim()}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border ${
                   isOptimizingPrompt
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse'
-                    : 'text-amber-400/90 hover:text-amber-300 hover:bg-amber-500/10 border-amber-500/25 hover:border-amber-500/50'
+                    : inputText.trim()
+                    ? 'text-amber-400 hover:bg-neutral-800 border-neutral-800'
+                    : 'text-neutral-500 border-transparent opacity-50'
                 }`}
-                title="Enhance & structure prompt with Bolex Prompt Studio AI"
+                title="Enhance prompt with Bolex Prompt Studio AI"
               >
-                <Wand2 className={`w-3.5 h-3.5 ${isOptimizingPrompt ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline text-[11px] font-semibold">
-                  {isOptimizingPrompt ? 'Optimizing...' : 'Magic Prompt'}
-                </span>
+                <Wand2 className={`w-3.5 h-3.5 ${isOptimizingPrompt ? 'animate-spin text-amber-400' : ''}`} />
+                <span className="hidden sm:inline text-[11px]">Enhance</span>
               </button>
-
-              {/* Bolex Tier Perks Badge / Upgrade trigger */}
-              {onOpenBolexPlus && (
-                effectiveTier === 'quantum' ? (
-                  <button
-                    id="input-bolex-quantum-active-btn"
-                    type="button"
-                    onClick={onOpenBolexPlus}
-                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-cyan-500/15 border border-cyan-500/40 hover:bg-cyan-500/25 text-cyan-300 flex items-center gap-1 text-xs transition-colors shadow-xs"
-                    title="Bolex Quantum Infinity VIP: Consensus Reasoning & Unlimited Bandwidth"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
-                    <span className="hidden sm:inline text-[11px] font-semibold">Quantum VIP</span>
-                  </button>
-                ) : effectiveTier === 'ultra' ? (
-                  <button
-                    id="input-bolex-ultra-active-btn"
-                    type="button"
-                    onClick={onOpenBolexPlus}
-                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-purple-500/15 border border-purple-500/30 hover:bg-purple-500/25 text-purple-300 flex items-center gap-1 text-xs transition-colors"
-                    title="Bolex Ultra VIP: Unlimited Tokens & VIP Zero-Latency Lane"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />
-                    <span className="hidden sm:inline text-[11px] font-semibold">Ultra VIP</span>
-                  </button>
-                ) : effectiveTier === 'plus' ? (
-                  <button
-                    id="input-bolex-plus-active-btn"
-                    type="button"
-                    onClick={onOpenBolexPlus}
-                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 text-amber-300 flex items-center gap-1 text-xs transition-colors"
-                    title="Bolex Plus member perks active: Unlimited Tokens & Turbo"
-                  >
-                    <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="hidden sm:inline text-[11px] font-semibold">Plus Active</span>
-                  </button>
-                ) : (
-                  <button
-                    id="input-bolex-plus-upgrade-btn"
-                    type="button"
-                    onClick={onOpenBolexPlus}
-                    className="p-1 sm:px-2 sm:py-1 rounded-lg bg-neutral-900 hover:bg-amber-500/10 border border-neutral-800 hover:border-amber-500/30 text-neutral-400 hover:text-amber-300 flex items-center gap-1 text-xs transition-colors"
-                    title="Start 3-Day Free Trial of Plus or Ultra: Infinite Tokens"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="hidden sm:inline text-[11px] font-medium">3-Day Trial</span>
-                  </button>
-                )
-              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="hidden sm:inline text-[11px] text-neutral-400">
-                Enter ↵ to send
-              </span>
+            {/* Right Action Icons: Mic & Circular Send Button */}
+            <div className="flex items-center gap-1.5">
+              {/* Mic Dictation */}
+              <button
+                id="voice-dictation-btn"
+                type="button"
+                onClick={toggleListening}
+                className={`p-2 rounded-full transition-all flex items-center justify-center ${
+                  isListening
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
+                }`}
+                title={isListening ? 'Stop voice dictation' : 'Dictate with microphone'}
+              >
+                <Mic className="w-4 h-4" />
+              </button>
 
-              {onOpenShortcuts && (
-                <button
-                  id="chat-shortcuts-helper-btn"
-                  type="button"
-                  onClick={onOpenShortcuts}
-                  className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono text-neutral-400 hover:text-amber-300 hover:bg-neutral-800 transition-colors border border-transparent hover:border-neutral-700"
-                  title="View keyboard shortcuts cheat sheet (?)"
-                >
-                  <kbd className="font-bold">?</kbd>
-                  <span className="text-[9px]">shortcuts</span>
-                </button>
-              )}
-
+              {/* Circular Send Arrow Button / Stop Button */}
               {isLoading ? (
                 <button
                   id="stop-generation-btn"
                   type="button"
                   onClick={onStopGeneration}
-                  className="p-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition-colors"
-                  title="Stop response"
+                  className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-950 flex items-center justify-center transition-all cursor-pointer shadow-md"
+                  title="Stop generating"
                 >
-                  <Square className="w-4 h-4 fill-current" />
-                </button>
-              ) : isLimitReached ? (
-                <button
-                  id="limit-reached-trial-btn"
-                  type="button"
-                  onClick={onOpenBolexPlus}
-                  className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all flex items-center gap-1 shadow-md shadow-rose-900/30 cursor-pointer"
-                  title="Free 60 questions limit reached. Click to start a 3-Day Free Trial for unlimited questions."
-                >
-                  <Crown className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Unlock (3-Day Trial)</span>
-                  <span className="sm:hidden">Unlock</span>
+                  <Square className="w-3.5 h-3.5 fill-current" />
                 </button>
               ) : (
                 <button
@@ -691,9 +620,9 @@ export function ChatInput({
                   type="button"
                   onClick={handleSubmit}
                   disabled={(!inputText.trim() && !attachedImage) || disabled}
-                  className={`p-2 rounded-lg transition-all ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                     inputText.trim() || attachedImage
-                      ? 'bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-xs cursor-pointer'
+                      ? 'bg-white hover:bg-neutral-200 text-neutral-950 shadow-md cursor-pointer scale-100'
                       : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                   }`}
                   title="Send message"
@@ -705,15 +634,10 @@ export function ChatInput({
           </div>
         </div>
 
-        {/* Dedicated Chat Footer Token Usage Indicator */}
-        <TokenIndicator
-          tokens={sessionTokens}
-          tier={effectiveTier}
-          isTrialActive={isTrialActive}
-          trialRemainingText={trialRemainingText}
-          onOpenUpgradeModal={onOpenBolexPlus || (() => {})}
-          variant="footer"
-        />
+        {/* Centered Disclaimer */}
+        <p className="text-[11px] text-neutral-500 text-center tracking-normal">
+          Bolex can make mistakes. Check important info.
+        </p>
       </div>
     </div>
   );

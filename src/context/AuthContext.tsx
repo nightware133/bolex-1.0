@@ -350,6 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem('bolex_founder_passkey_session');
     setUser(null);
     setProfile(null);
     setIsLocalUser(false);
