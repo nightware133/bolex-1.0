@@ -59,9 +59,12 @@ export function estimateMessageTokens(message: ChatMessage): {
   // Overhead per message envelope in chat format
   tokenCount += 4;
   
-  // Image tokens if user attached an image (~258 tokens standard Gemini multimodal tile)
-  if (message.image) {
-    tokenCount += 258;
+  // Image tokens if user attached image(s) (~258 tokens standard Gemini multimodal tile per image)
+  const attachedCount = (message.images && message.images.length > 0)
+    ? message.images.length
+    : (message.image ? 1 : 0);
+  if (attachedCount > 0) {
+    tokenCount += 258 * attachedCount;
   }
 
   if (isAssistant) {

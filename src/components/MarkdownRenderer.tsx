@@ -1,6 +1,7 @@
 import React, { useState, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Cpu, Download } from 'lucide-react';
+import { exportCodeToColab } from '../lib/colabExporter';
 
 interface MarkdownRendererProps {
   content: string;
@@ -13,6 +14,7 @@ interface CodeBlockProps {
 
 const CodeBlock = memo(function CodeBlock({ language, codeText }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const [downloadedIpynb, setDownloadedIpynb] = useState(false);
 
   const handleCopy = async () => {
     try {
@@ -24,30 +26,87 @@ const CodeBlock = memo(function CodeBlock({ language, codeText }: CodeBlockProps
     }
   };
 
+  const handleOpenColab = () => {
+    window.dispatchEvent(
+      new CustomEvent('bolex:open-colab', {
+        detail: { code: codeText, language: language || 'python' },
+      })
+    );
+  };
+
+  const handleQuickDownloadIpynb = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    exportCodeToColab(codeText, language || 'python', 'Bolex_Code_Session');
+    setDownloadedIpynb(true);
+    setTimeout(() => setDownloadedIpynb(false), 2500);
+  };
+
+  const isColabCompatible =
+    ['python', 'py', 'bash', 'sh', 'shell', 'r', 'sql', ''].includes(
+      (language || '').toLowerCase()
+    ) ||
+    codeText.includes('import ') ||
+    codeText.includes('def ') ||
+    codeText.includes('torch') ||
+    codeText.includes('plt.') ||
+    codeText.includes('np.') ||
+    codeText.includes('pd.');
+
   return (
     <div className="my-3 rounded-lg overflow-hidden border border-neutral-800 bg-neutral-950 font-mono text-xs not-prose">
       <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-900 border-b border-neutral-800/80 text-neutral-400 select-none">
         <span className="text-[11px] font-medium tracking-wide uppercase">
           {language || 'code'}
         </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer"
-          title="Copy code"
-        >
-          {copied ? (
+
+        <div className="flex items-center gap-1.5">
+          {isColabCompatible && (
             <>
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] text-emerald-400">Copied</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3.5 h-3.5" />
-              <span className="text-[11px]">Copy</span>
+              <button
+                type="button"
+                onClick={handleQuickDownloadIpynb}
+                className="flex items-center gap-1 px-2 py-0.5 rounded hover:bg-neutral-800 text-neutral-400 hover:text-amber-300 transition-colors cursor-pointer text-[10px]"
+                title="Download as Jupyter .ipynb notebook"
+              >
+                {downloadedIpynb ? (
+                  <Check className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Download className="w-3 h-3" />
+                )}
+                <span>{downloadedIpynb ? 'Saved' : '.ipynb'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenColab}
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-colors cursor-pointer text-[11px] font-medium"
+                title="Open in Google Colab with GPU/TPU acceleration"
+              >
+                <Cpu className="w-3 h-3 text-amber-400" />
+                <span>Run in Colab</span>
+              </button>
             </>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer"
+            title="Copy code"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] text-emerald-400">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Copy</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
       <div className="p-3 overflow-x-auto text-neutral-200 leading-relaxed font-mono">
         <pre className="p-0 m-0 bg-transparent border-0 font-mono text-xs">

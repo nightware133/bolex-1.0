@@ -21,7 +21,9 @@ import {
   Anchor,
   SquarePen,
   Lock,
-  Crown
+  Crown,
+  BookOpen,
+  Cpu
 } from 'lucide-react';
 import { PersonaRole } from '../types';
 import { AI_MODELS } from '../constants';
@@ -56,6 +58,8 @@ interface HeaderProps {
   onOpenFounder?: () => void;
   isFounder?: boolean;
   onOpenShare?: () => void;
+  onOpenKnowledgeBase?: () => void;
+  onOpenColab?: () => void;
   onOpenGiveaways?: () => void;
   activeGiveawaysCount?: number;
   hasMessages: boolean;
@@ -89,6 +93,8 @@ export function Header({
   onOpenFounder,
   isFounder = false,
   onOpenShare,
+  onOpenKnowledgeBase,
+  onOpenColab,
   isBackendConnected,
   selectedModelVersion = 'bolex-3.8',
   onSelectModelVersion,
@@ -336,6 +342,34 @@ export function Header({
           </button>
         )}
 
+        {/* Knowledge Base & NLU Button */}
+        {onOpenKnowledgeBase && (
+          <button
+            id="header-kb-btn"
+            type="button"
+            onClick={onOpenKnowledgeBase}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-neutral-200 hover:text-white bg-neutral-800 hover:bg-neutral-750 border border-neutral-700/60 transition-colors cursor-pointer"
+            title="Open Knowledge Base & NLU Studio"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden md:inline">Knowledge &amp; NLU</span>
+          </button>
+        )}
+
+        {/* Google Colab Cloud Studio Button */}
+        {onOpenColab && (
+          <button
+            id="header-colab-btn"
+            type="button"
+            onClick={onOpenColab}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-neutral-200 hover:text-white bg-neutral-800 hover:bg-neutral-750 border border-neutral-700/60 transition-colors cursor-pointer"
+            title="Google Colab Cloud Accelerator (GPU/TPU & Jupyter)"
+          >
+            <Cpu className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden lg:inline">Colab Studio</span>
+          </button>
+        )}
+
         {/* Profile / Account Avatar */}
         <div className="relative" ref={profileMenuRef}>
           <button
@@ -369,6 +403,34 @@ export function Header({
               >
                 <span>My Profile &amp; Plan</span>
               </button>
+
+              {onOpenColab && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenColab();
+                    setIsProfileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-neutral-800 text-neutral-200 transition-colors flex items-center gap-2"
+                >
+                  <Cpu className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Google Colab Accelerator</span>
+                </button>
+              )}
+
+              {onOpenKnowledgeBase && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenKnowledgeBase();
+                    setIsProfileMenuOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-neutral-800 text-neutral-200 transition-colors flex items-center gap-2"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Knowledge &amp; NLU Studio</span>
+                </button>
+              )}
 
               <button
                 type="button"

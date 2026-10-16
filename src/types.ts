@@ -36,12 +36,31 @@ export interface AIModelVersion {
   isLockedForFree?: boolean;
 }
 
+export interface KnowledgeSource {
+  id: string;
+  type: 'wikipedia' | 'developer_docs';
+  title: string;
+  snippet: string;
+  url?: string;
+  category?: string;
+  relevanceScore?: number;
+}
+
+export interface NLUAnalysisResult {
+  detectedIdioms: { phrase: string; meaning: string; category: string }[];
+  normalizedQuery: string;
+  intent: 'engineering' | 'factual' | 'conversational' | 'hybrid';
+  syntacticComplexity: 'simple' | 'compound' | 'complex';
+  keyEntities: string[];
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
   image?: ImageAttachment;
+  images?: ImageAttachment[]; // Up to 6 images for multi-image vision analysis
   isStreaming?: boolean;
   error?: string;
   grounding?: GroundingMetadata;
@@ -54,6 +73,8 @@ export interface ChatMessage {
     total: number;
     tokensPerSecond?: number;
   };
+  knowledgeSources?: KnowledgeSource[];
+  nluAnalysis?: NLUAnalysisResult;
 }
 
 export interface PersonaRole {

@@ -196,11 +196,12 @@ export function FounderAdminModal({
   };
 
   const handleDeleteGiveaway = (id: string) => {
-    if (!confirm('Are you sure you want to delete this giveaway?')) return;
     const updated = giveaways.filter((g) => g.id !== id);
     setGiveaways(updated);
     saveStoredGiveaways(updated);
     if (onGiveawaysUpdated) onGiveawaysUpdated(updated);
+    setActionSuccess('Giveaway deleted successfully.');
+    setTimeout(() => setActionSuccess(null), 2500);
   };
 
   // Announcement actions
@@ -497,10 +498,29 @@ export function FounderAdminModal({
 
                   {/* Active Giveaways List */}
                   <div className="space-y-3">
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-amber-400" />
-                      <span>Active & Past Giveaways ({giveaways.length})</span>
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-amber-400" />
+                        <span>Active & Past Giveaways ({giveaways.length})</span>
+                      </h4>
+                      {giveaways.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const activeOnly = giveaways.filter(g => g.status === 'active');
+                            setGiveaways(activeOnly);
+                            saveStoredGiveaways(activeOnly);
+                            if (onGiveawaysUpdated) onGiveawaysUpdated(activeOnly);
+                            setActionSuccess('Cleared past/drawn giveaways successfully!');
+                            setTimeout(() => setActionSuccess(null), 3000);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Delete Past Giveaways</span>
+                        </button>
+                      )}
+                    </div>
 
                     {giveaways.map((g) => (
                       <div key={g.id} className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800 space-y-3">

@@ -142,10 +142,11 @@ export function BolexPlusModal({ isOpen, onClose, onOpenCheckout }: BolexPlusMod
     },
     {
       feature: 'Voice Microphone Dictation',
-      free: 'Standard',
-      plus: 'Continuous Hands-Free Pro',
-      ultra: 'Continuous Pro + Acoustic Filter',
-      quantum: 'Quantum Real-Time Ambient DSP Dictation',
+      free: '2 Mins Continuous',
+      plus: '4 Mins Continuous',
+      ultra: '7 Mins Continuous',
+      quantum: '16 Mins Continuous Max',
+      highlight: true,
     },
     {
       feature: 'Inference Speed & Latency',
@@ -315,7 +316,7 @@ export function BolexPlusModal({ isOpen, onClose, onOpenCheckout }: BolexPlusMod
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                        <span>Standard voice dictation</span>
+                        <span>Voice dictation (2 mins limit)</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
@@ -391,7 +392,7 @@ export function BolexPlusModal({ isOpen, onClose, onOpenCheckout }: BolexPlusMod
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span>Continuous Voice Dictation Pro</span>
+                        <span>Continuous Voice Dictation Pro (4 mins cap)</span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -513,6 +514,10 @@ export function BolexPlusModal({ isOpen, onClose, onOpenCheckout }: BolexPlusMod
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                        <span><strong>7 Mins Continuous Voice Dictation</strong></span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                         <span>Universal Export (Markdown, JSON, PDF)</span>
                       </li>
                     </ul>
@@ -627,7 +632,7 @@ export function BolexPlusModal({ isOpen, onClose, onOpenCheckout }: BolexPlusMod
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span><strong>Neural Acoustic Voice Studio</strong></span>
+                        <span><strong>16 Mins Max Voice Dictation Studio</strong></span>
                       </li>
                       <li className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />

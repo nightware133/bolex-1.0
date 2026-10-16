@@ -18,7 +18,9 @@ import {
   Anchor,
   BrainCircuit,
   Share2,
-  Zap
+  Zap,
+  BookOpen,
+  Cpu
 } from 'lucide-react';
 
 interface ShortcutItem {
@@ -33,6 +35,7 @@ interface ShortcutItem {
 const SHORTCUTS: ShortcutItem[] = [
   // Chat & Navigation
   {
+    id: 'send-message',
     category: 'chat',
     title: 'Send Message',
     description: 'Submit your prompt or question to the AI model',
@@ -40,6 +43,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: MessageSquare,
   },
   {
+    id: 'new-line',
     category: 'chat',
     title: 'New Line in Input',
     description: 'Insert a line break without sending the message',
@@ -47,6 +51,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: MessageSquare,
   },
   {
+    id: 'new-conversation',
     category: 'chat',
     title: 'Start New Conversation',
     description: 'Create a fresh chat session and focus the input',
@@ -54,6 +59,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Sparkles,
   },
   {
+    id: 'toggle-sidebar',
     category: 'chat',
     title: 'Toggle Sidebar',
     description: 'Show or hide the chat history and folder drawer',
@@ -61,6 +67,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: MessageSquare,
   },
   {
+    id: 'shortcuts-help',
     category: 'chat',
     title: 'Keyboard Shortcuts Help',
     description: 'Show this keyboard productivity cheat sheet',
@@ -68,6 +75,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Keyboard,
   },
   {
+    id: 'close-modal',
     category: 'chat',
     title: 'Close Modal / Cancel',
     description: 'Dismiss any open dialog or active microphone dictation',
@@ -77,6 +85,7 @@ const SHORTCUTS: ShortcutItem[] = [
 
   // Tools & Intelligence
   {
+    id: 'contextual-anchors',
     category: 'tools',
     title: 'Contextual Anchors & Vault',
     description: 'Open Project Memory Vault to manage persistent docs & schemas',
@@ -84,6 +93,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Anchor,
   },
   {
+    id: 'toggle-cognitive-trace',
     category: 'tools',
     title: 'Toggle Cognitive Trace',
     description: 'Turn raw step-by-step reasoning monologue ON or OFF',
@@ -91,6 +101,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: BrainCircuit,
   },
   {
+    id: 'quantum-hyper-reasoning',
     category: 'tools',
     title: 'Quantum Hyper-Reasoning',
     description: 'Toggle multi-branch hypothesis evaluation & consensus synthesis',
@@ -98,6 +109,15 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Zap,
   },
   {
+    id: 'open-kb',
+    category: 'tools',
+    title: 'Knowledge Base & NLU Studio',
+    description: 'Explore live Wikipedia API retrieval, DevDocs, and NLU idiom analyzer',
+    keys: ['⌘/Ctrl', 'Shift', 'K'],
+    icon: BookOpen,
+  },
+  {
+    id: 'open-map',
     category: 'tools',
     title: 'Open Map Studio',
     description: 'Launch the AI Concept Graph & Geographic Explorer',
@@ -105,6 +125,7 @@ const SHORTCUTS: ShortcutItem[] = [
     icon: Compass,
   },
   {
+    id: 'toggle-web-search',
     category: 'tools',
     title: 'Toggle Web Search',
     description: 'Turn Google Web Search Grounding ON or OFF',
@@ -150,6 +171,14 @@ const SHORTCUTS: ShortcutItem[] = [
     description: 'View Plus & Ultra VIP infinite token perks',
     keys: ['⌘/Ctrl', 'Shift', 'U'],
     icon: Crown,
+  },
+  {
+    id: 'open-colab',
+    category: 'tools',
+    title: 'Google Colab Cloud Accelerator',
+    description: 'Launch GPU/TPU accelerator & Jupyter notebook builder',
+    keys: ['⌘/Ctrl', 'Shift', 'C'],
+    icon: Cpu,
   },
 
   // Audio & Voice
@@ -340,11 +369,11 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
               No shortcuts found matching "{search}".
             </div>
           ) : (
-            filteredShortcuts.map((item) => {
+            filteredShortcuts.map((item, index) => {
               const Icon = item.icon || Command;
               return (
                 <div
-                  key={item.id}
+                  key={item.id || item.title || index}
                   className="p-3 rounded-xl bg-neutral-950/70 border border-neutral-800/80 hover:border-neutral-700/80 transition-colors flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">

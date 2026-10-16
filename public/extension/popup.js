@@ -254,6 +254,66 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Anti-Copy Warning Patterns & Cleaner
+  const ANTI_COPY_PATTERNS = [
+    /Copying this information won['’]?t help you achieve mastery of the content\.?\s*You can master it on your own!?/gi,
+    /Copying this information won['’]?t help you achieve mastery of the content\.?/gi,
+    /You can master it on your own!?/gi,
+    /Mastery of the content cannot be achieved by copying\.?/gi,
+    /Read more at:\s*https?:\/\/[^\s]+/gi,
+    /Source:\s*https?:\/\/[^\s]+/gi,
+    /Copied from\s+[^\n\r]+/gi,
+    /All rights reserved\.?\s*Copyright ©\s*\d{4}[^\n\r]*/gi
+  ];
+
+  function sanitizeAntiCopyTextPopup(text) {
+    if (!text) return { cleaned: '', wasCleaned: false };
+    let cleaned = text;
+    let wasCleaned = false;
+    for (const pattern of ANTI_COPY_PATTERNS) {
+      if (pattern.test(cleaned)) {
+        wasCleaned = true;
+        cleaned = cleaned.replace(pattern, '');
+      }
+    }
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+    return { cleaned, wasCleaned };
+  }
+
+  // Auto Paste Button Listener
+  const autoPasteBtn = document.getElementById('autoPasteBtn');
+  if (autoPasteBtn && chatInput) {
+    autoPasteBtn.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          const res = sanitizeAntiCopyTextPopup(text);
+          chatInput.value = chatInput.value ? `${chatInput.value}\n${res.cleaned}` : res.cleaned;
+          chatInput.focus();
+        }
+      } catch (err) {
+        // ignore
+      }
+    });
+  }
+
+  // Intercept Paste in Input
+  if (chatInput) {
+    chatInput.addEventListener('paste', (e) => {
+      const pasted = e.clipboardData?.getData('text');
+      if (pasted) {
+        const res = sanitizeAntiCopyTextPopup(pasted);
+        if (res.wasCleaned) {
+          e.preventDefault();
+          const start = chatInput.selectionStart || 0;
+          const end = chatInput.selectionEnd || 0;
+          chatInput.value = chatInput.value.slice(0, start) + res.cleaned + chatInput.value.slice(end);
+          chatInput.selectionStart = chatInput.selectionEnd = start + res.cleaned.length;
+        }
+      }
+    });
+  }
+
   // Clipboard Paste for Screenshots
   document.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;

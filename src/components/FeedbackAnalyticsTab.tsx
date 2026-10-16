@@ -18,7 +18,10 @@ import {
   Activity,
   ArrowUpDown,
   Cpu,
-  Check
+  Check,
+  BookOpen,
+  Globe,
+  Code2
 } from 'lucide-react';
 import { MessageFeedback, FeedbackStats, FeedbackCategory, ChatSession } from '../types';
 import { 
@@ -34,6 +37,7 @@ import {
   exportPerformanceToCSV, 
   GlobalPerformanceMetrics 
 } from '../lib/performanceMonitor';
+import { KNOWN_IDIOMS } from '../lib/nluEngine';
 
 interface FeedbackAnalyticsTabProps {
   sessions?: ChatSession[];
@@ -65,6 +69,22 @@ export const FeedbackAnalyticsTab: React.FC<FeedbackAnalyticsTabProps> = ({
 
   const performance = useMemo(() => {
     return calculatePerformanceMetrics(sessions);
+  }, [sessions]);
+
+  const kbMetrics = useMemo(() => {
+    let kbCitationsCount = 0;
+    let idiomsResolvedCount = 0;
+    for (const s of sessions) {
+      for (const m of s.messages) {
+        if (m.knowledgeSources && m.knowledgeSources.length > 0) {
+          kbCitationsCount += m.knowledgeSources.length;
+        }
+        if (m.nluAnalysis?.detectedIdioms && m.nluAnalysis.detectedIdioms.length > 0) {
+          idiomsResolvedCount += m.nluAnalysis.detectedIdioms.length;
+        }
+      }
+    }
+    return { kbCitationsCount, idiomsResolvedCount };
   }, [sessions]);
 
   const handleDelete = (id: string) => {
@@ -266,6 +286,36 @@ export const FeedbackAnalyticsTab: React.FC<FeedbackAnalyticsTabProps> = ({
           <p className="text-[10px] text-emerald-400 mt-2 font-medium">
             {stats.totalCount > 0 ? `${stats.positivePercentage}% positive (4-5★)` : '100% baseline quality'}
           </p>
+        </div>
+      </div>
+
+      {/* Connected Knowledge Base & NLU Active Health Card */}
+      <div className="p-3.5 rounded-xl bg-neutral-950/70 border border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+            <BookOpen className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="font-semibold text-white flex items-center gap-2">
+              <span>Hybrid Knowledge Base &amp; NLU Grounding Active</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+            <p className="text-[11px] text-neutral-400 mt-0.5">
+              Wikipedia REST API &bull; Developer Docs Corpus &bull; Idiom Resolver ({KNOWN_IDIOMS.length} idioms indexed)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 font-mono text-[11px]">
+          <span className="px-2 py-1 rounded-md bg-neutral-900 border border-neutral-800 text-sky-300">
+            {kbMetrics.kbCitationsCount} KB citations
+          </span>
+          <span className="px-2 py-1 rounded-md bg-neutral-900 border border-neutral-800 text-amber-300">
+            {kbMetrics.idiomsResolvedCount} idioms resolved
+          </span>
+          <span className="px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+            15 RPM safe
+          </span>
         </div>
       </div>
 

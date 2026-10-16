@@ -23,7 +23,8 @@ import {
   AlertTriangle,
   Lock,
   BarChart3,
-  Star
+  Star,
+  ClipboardPaste
 } from 'lucide-react';
 import { speechManager } from '../lib/speechManager';
 import { ChatSession } from '../types';
@@ -78,6 +79,25 @@ export function SettingsModal({
   const [isTestingSpeech, setIsTestingSpeech] = useState(false);
 
   const { themeMode, resolvedTheme, setThemeMode, systemPreference } = useTheme();
+
+  const [pasteOnFocusEnabled, setPasteOnFocusEnabled] = useState<boolean>(() => {
+    try {
+      const val = localStorage.getItem('bolex_paste_on_focus_enabled');
+      return val === null ? true : val === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleTogglePasteOnFocus = (val: boolean) => {
+    setPasteOnFocusEnabled(val);
+    try {
+      localStorage.setItem('bolex_paste_on_focus_enabled', String(val));
+      window.dispatchEvent(new CustomEvent('bolex_paste_on_focus_changed', { detail: val }));
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     setLocalTemp(temperature);
@@ -377,6 +397,54 @@ export function SettingsModal({
                   <div className="text-[11px] text-neutral-400 font-mono">
                     OS Preference Detected: <strong className="text-amber-300 capitalize">{systemPreference}</strong> ({themeMode === 'system' ? 'Synced' : 'Manual'})
                   </div>
+                </div>
+              </div>
+
+              {/* Clipboard & Input Convenience Settings */}
+              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-bold text-white">
+                    <ClipboardPaste className="w-4 h-4 text-emerald-400" />
+                    <span>Smart Clipboard &amp; Paste-on-Focus</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    CONVENIENCE
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-400 leading-relaxed">
+                  Automatically detect when the clipboard contains text upon focusing the chat window and display an interactive prompt to insert it directly. Also automatically neutralizes anti-copy educational warnings (e.g. <em>"Copying this information won't help you achieve mastery of the content..."</em>).
+                </p>
+
+                {/* Toggle Control Card */}
+                <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800/80 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-xs text-white flex items-center gap-1.5">
+                      <span>Paste-on-Focus Auto-Detection</span>
+                      {pasteOnFocusEnabled ? (
+                        <span className="text-[10px] text-emerald-400 font-normal">(Active)</span>
+                      ) : (
+                        <span className="text-[10px] text-neutral-500 font-normal">(Disabled)</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-neutral-400 mt-0.5">
+                      Prompts 1-click insertion when switching back to Bolex with copied text
+                    </div>
+                  </div>
+
+                  <button
+                    id="toggle-paste-on-focus-setting-btn"
+                    type="button"
+                    onClick={() => handleTogglePasteOnFocus(!pasteOnFocusEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      pasteOnFocusEnabled ? 'bg-emerald-500' : 'bg-neutral-750'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        pasteOnFocusEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>

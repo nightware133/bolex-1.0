@@ -16,7 +16,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   Gauge,
-  Clock
+  Clock,
+  Maximize2,
+  X,
+  Eye,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { AI_MODELS } from '../constants';
@@ -26,6 +31,7 @@ import { speechManager, SpeechState } from '../lib/speechManager';
 import { getSpeechMetrics } from '../lib/speech';
 import { useAuth } from '../context/AuthContext';
 import { MessageFeedbackWidget } from './MessageFeedbackWidget';
+import { KnowledgeCitationPills } from './KnowledgeCitationPills';
 
 interface MessageItemProps {
   message: ChatMessage;
@@ -52,10 +58,29 @@ export const MessageItem = memo(function MessageItem({
 }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [speechState, setSpeechState] = useState<SpeechState>(() => speechManager.getState());
   const [showSpeedControls, setShowSpeedControls] = useState(false);
   const isUser = message.role === 'user';
+  const messageImages = (message.images && message.images.length > 0)
+    ? message.images
+    : (message.image ? [message.image] : []);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxIndex(null);
+      } else if (e.key === 'ArrowLeft' && messageImages.length > 1) {
+        setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : messageImages.length - 1));
+      } else if (e.key === 'ArrowRight' && messageImages.length > 1) {
+        setLightboxIndex((prev) => (prev !== null && prev < messageImages.length - 1 ? prev + 1 : 0));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, messageImages.length]);
   const { effectiveTier } = useAuth();
   const isQuantum = effectiveTier === 'quantum';
   const isUltra = effectiveTier === 'ultra';
@@ -186,14 +211,144 @@ export const MessageItem = memo(function MessageItem({
       >
         <div className="max-w-3xl w-full flex justify-end">
           <div className="group relative max-w-[85%] sm:max-w-[75%] rounded-3xl bg-neutral-800 text-neutral-100 px-5 py-3 shadow-xs">
-            {/* User Attached Image */}
-            {message.image && (
-              <div className="mb-2.5 inline-block max-w-full rounded-xl overflow-hidden border border-neutral-700 bg-neutral-950">
-                <img
-                  src={message.image.previewUrl}
-                  alt={message.image.name || 'User attachment'}
-                  className="max-h-60 w-auto object-contain rounded-xl"
-                />
+            {/* User Attached Image with Vision AI Badge & Lightbox Zoom */}
+            {/* User Attached Images (Supports up to 6 pictures with Responsive Grid & Lightbox) */}
+            {messageImages.length > 0 && (
+              <div className="mb-2.5 space-y-2">
+                {messageImages.length === 1 ? (
+                  // Single image presentation
+                  <div 
+                    onClick={() => setLightboxIndex(0)}
+                    className="group/img relative inline-block max-w-full rounded-2xl overflow-hidden border border-neutral-700/80 bg-neutral-950 shadow-md cursor-pointer hover:border-amber-500/50 transition-all"
+                    title="Click to expand picture"
+                  >
+                    <img
+                      src={messageImages[0].previewUrl}
+                      alt={messageImages[0].name || 'User picture'}
+                      className="max-h-64 sm:max-h-72 w-auto object-contain rounded-2xl group-hover/img:scale-[1.01] transition-transform duration-200"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white text-xs font-semibold backdrop-blur-[2px]">
+                      <Maximize2 className="w-4 h-4 text-amber-400" />
+                      <span>Expand Picture</span>
+                    </div>
+                  </div>
+                ) : (
+                  // Multi-image responsive grid (2 to 6 images)
+                  <div className={`grid gap-2 ${
+                    messageImages.length === 2 ? 'grid-cols-2 max-w-md' :
+                    messageImages.length === 3 ? 'grid-cols-3 max-w-lg' :
+                    messageImages.length === 4 ? 'grid-cols-2 sm:grid-cols-4' :
+                    'grid-cols-3'
+                  }`}>
+                    {messageImages.map((img, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => setLightboxIndex(idx)}
+                        className="group/thumb relative aspect-square rounded-xl overflow-hidden border border-neutral-700/80 bg-neutral-950 shadow-sm cursor-pointer hover:border-amber-400 transition-all"
+                        title={`Click to expand picture ${idx + 1}`}
+                      >
+                        <img
+                          src={img.previewUrl}
+                          alt={img.name || `Picture ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-200"
+                        />
+                        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono font-bold text-amber-300 border border-white/10">
+                          {idx + 1}/{messageImages.length}
+                        </div>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
+                          <Maximize2 className="w-4 h-4 text-amber-400" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 text-[10.5px] text-neutral-400 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 font-medium">
+                    <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                    <span>Multimodal Vision Input {messageImages.length > 1 ? `(${messageImages.length} pictures)` : ''}</span>
+                  </span>
+                  {messageImages.length === 1 && messageImages[0].name && (
+                    <span className="truncate max-w-[180px] text-neutral-400" title={messageImages[0].name}>
+                      {messageImages[0].name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Lightbox Modal with Next/Previous Navigation */}
+                {lightboxIndex !== null && messageImages[lightboxIndex] && (
+                  <div 
+                    className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 cursor-default"
+                    onClick={() => setLightboxIndex(null)}
+                  >
+                    <div 
+                      className="relative max-w-4xl max-h-[90vh] flex flex-col items-center justify-center w-full"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="relative flex items-center justify-center w-full">
+                        {messageImages.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : messageImages.length - 1))}
+                            className="absolute -left-2 sm:-left-12 z-10 p-2.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 hover:text-white transition-all cursor-pointer shadow-xl"
+                            title="Previous image (Left arrow)"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                        )}
+
+                        <img
+                          src={messageImages[lightboxIndex].previewUrl}
+                          alt={messageImages[lightboxIndex].name || 'Full screen preview'}
+                          className="max-w-full max-h-[78vh] object-contain rounded-2xl border border-neutral-800 shadow-2xl"
+                        />
+
+                        {messageImages.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex((prev) => (prev !== null && prev < messageImages.length - 1 ? prev + 1 : 0))}
+                            className="absolute -right-2 sm:-right-12 z-10 p-2.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 hover:text-white transition-all cursor-pointer shadow-xl"
+                            title="Next image (Right arrow)"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between w-full px-2 text-xs text-neutral-300">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-neutral-200 truncate max-w-xs sm:max-w-md">
+                            {messageImages[lightboxIndex].name || `Picture ${lightboxIndex + 1}`}
+                          </span>
+                          {messageImages.length > 1 && (
+                            <span className="px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono text-[10.5px] border border-neutral-700">
+                              {lightboxIndex + 1} of {messageImages.length}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={messageImages[lightboxIndex].previewUrl}
+                            download={messageImages[lightboxIndex].name || `picture_${lightboxIndex + 1}.png`}
+                            className="px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex(null)}
+                            className="p-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-300 hover:text-white cursor-pointer"
+                            title="Close preview (Esc)"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -305,6 +460,9 @@ export const MessageItem = memo(function MessageItem({
           {message.isStreaming && message.content && (
             <span className="inline-block w-1.5 h-4 ml-1 bg-amber-400 animate-pulse align-middle" />
           )}
+
+          {/* Synthesized Knowledge Base Sources (Wikipedia & Developer Docs) */}
+          <KnowledgeCitationPills sources={message.knowledgeSources} />
 
           {/* Google Search Grounding Sources (Source pill cards) */}
           {hasSources && (

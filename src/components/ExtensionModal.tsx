@@ -222,76 +222,206 @@ export function ExtensionModal({ isOpen, onClose }: ExtensionModalProps) {
             </div>
           </div>
 
-          {/* Installation Steps */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider">
-              3-Step Installation Guide (Under 30 Seconds)
-            </h4>
+          {/* Tab View 1 & 2: Chrome / Edge Step-by-Step Installation */}
+          {(activeTab === 'chrome' || activeTab === 'edge') && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider">
+                3-Step Installation Guide (Under 30 Seconds)
+              </h4>
 
-            <div className="space-y-2.5 text-xs text-neutral-300">
-              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center shrink-0 text-[11px]">
-                  1
-                </span>
-                <div className="space-y-1">
-                  <span className="font-medium text-white">Unzip the downloaded package</span>
-                  <p className="text-neutral-400 text-[11px] leading-relaxed">
-                    Click the download button above, right-click the downloaded <code className="px-1 py-0.5 bg-neutral-900 rounded text-amber-300 font-mono text-[10px]">bolex-extension.zip</code>, and select <strong>"Extract All"</strong> (or double-click on Mac).
-                  </p>
+              <div className="space-y-2.5 text-xs text-neutral-300">
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    1
+                  </span>
+                  <div className="space-y-1">
+                    <span className="font-medium text-white">Download &amp; Extract ZIP</span>
+                    <p className="text-neutral-400 text-[11px] leading-relaxed">
+                      Click the <strong>Download .ZIP</strong> button above. Right-click the downloaded <code className="px-1 py-0.5 bg-neutral-900 rounded text-amber-300 font-mono text-[10px]">bolex-extension.zip</code> and select <strong>"Extract All"</strong> (or double click to expand into a folder).
+                    </p>
+                    <p className="text-amber-400/90 text-[10.5px]">
+                      ⚠️ <em>Note: Chrome requires an extracted folder (do not drag the raw .zip file directly into the browser).</em>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    2
+                  </span>
+                  <div className="space-y-1">
+                    <span className="font-medium text-white">Open Browser Extensions &amp; Enable Developer Mode</span>
+                    <p className="text-neutral-400 text-[11px] leading-relaxed">
+                      Open a new tab and go to{' '}
+                      <code className="px-1.5 py-0.5 bg-neutral-900 border border-neutral-700 rounded text-amber-300 font-mono text-[11px]">
+                        {activeTab === 'edge' ? 'edge://extensions' : 'chrome://extensions'}
+                      </code>.
+                    </p>
+                    <p className="text-neutral-400 text-[11px] leading-relaxed">
+                      In the top-right corner of the Extensions page, toggle <strong>"Developer mode"</strong> to <strong>ON</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-3">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center shrink-0 text-[11px]">
+                    3
+                  </span>
+                  <div className="space-y-1">
+                    <span className="font-medium text-white">Click "Load unpacked" and Select the Extracted Folder</span>
+                    <p className="text-neutral-400 text-[11px] leading-relaxed">
+                      Click the <strong>"Load unpacked"</strong> button in the top-left toolbar, and select the folder containing <code className="px-1 py-0.5 bg-neutral-900 rounded text-amber-300 font-mono text-[10px]">manifest.json</code>.
+                    </p>
+                    <p className="text-emerald-400 text-[10.5px] font-medium">
+                      ✅ Bolex AI will appear in your browser toolbar ready to use with shortcut <kbd className="px-1 py-0.5 bg-neutral-800 rounded font-mono text-emerald-300 text-[10px]">Ctrl+Shift+B</kbd>!
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center shrink-0 text-[11px]">
-                  2
-                </span>
-                <div className="space-y-1">
-                  <span className="font-medium text-white">Open your browser Extensions page</span>
-                  <p className="text-neutral-400 text-[11px] leading-relaxed">
-                    Navigate to{' '}
-                    <code className="px-1.5 py-0.5 bg-neutral-900 border border-neutral-700 rounded text-amber-300 font-mono text-[11px]">
-                      {activeTab === 'edge' ? 'edge://extensions' : 'chrome://extensions'}
-                    </code>{' '}
-                    and toggle on <strong>"Developer mode"</strong> in the top-right corner.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/80 flex items-start gap-3">
-                <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold flex items-center justify-center shrink-0 text-[11px]">
-                  3
-                </span>
-                <div className="space-y-1">
-                  <span className="font-medium text-white">Click "Load unpacked"</span>
-                  <p className="text-neutral-400 text-[11px] leading-relaxed">
-                    Click <strong>"Load unpacked"</strong> in your browser and select the unzipped folder. Bolex will immediately appear in your browser toolbar with shortcut <kbd className="px-1 py-0.5 bg-neutral-800 rounded font-mono text-amber-300 text-[10px]">Ctrl+Shift+B</kbd>!
+              {/* Quick Keyboard Shortcut */}
+              <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-start gap-2.5">
+                <Keyboard className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1 flex-1">
+                  <div className="font-medium text-white flex items-center justify-between">
+                    <span>Instant Browser Shortcut</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyShortcut}
+                      className="text-neutral-400 hover:text-white flex items-center gap-1 text-[11px]"
+                      title="Copy shortcut"
+                    >
+                      {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Press <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Ctrl+Shift+B</kbd> (or <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Cmd+Shift+B</kbd>) from any website or tab to trigger Bolex in popup or sidepanel mode.
                   </p>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Quick Keyboard Shortcut */}
-          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-start gap-2.5">
-            <Keyboard className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-xs space-y-1 flex-1">
-              <div className="font-medium text-white flex items-center justify-between">
-                <span>Instant Browser Shortcut</span>
+          {/* Tab View 3: Manifest V3 Specification & Format Inspector */}
+          {activeTab === 'manifest' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-semibold text-white">Manifest V3 Specification (manifest.json)</h4>
+                  <p className="text-[11px] text-neutral-400">
+                    Complies with Chrome &amp; Chromium Manifest V3 standards with service worker and sidepanel support.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={handleCopyShortcut}
-                  className="text-neutral-400 hover:text-white flex items-center gap-1 text-[11px]"
-                  title="Copy shortcut"
+                  onClick={() => {
+                    const manifestContent = JSON.stringify({
+                      manifest_version: 3,
+                      name: "Bolex AI - Browser Assistant & Workspace",
+                      version: "2.0.0",
+                      description: "Next-generation browser assistant powered by Bolex AI. Web search grounding, page summarization, vision analysis, and contextual side panel.",
+                      icons: {
+                        "16": "icons/icon16.png",
+                        "48": "icons/icon48.png",
+                        "128": "icons/icon128.png"
+                      },
+                      action: {
+                        default_popup: "popup.html",
+                        default_title: "Bolex AI Assistant (Ctrl+Shift+B)",
+                        default_icon: {
+                          "16": "icons/icon16.png",
+                          "48": "icons/icon48.png",
+                          "128": "icons/icon128.png"
+                        }
+                      },
+                      background: {
+                        service_worker: "background.js"
+                      },
+                      side_panel: {
+                        default_path: "popup.html"
+                      },
+                      commands: {
+                        _execute_action: {
+                          suggested_key: {
+                            default: "Ctrl+Shift+B",
+                            mac: "Command+Shift+B"
+                          },
+                          description: "Open Bolex AI Assistant"
+                        },
+                        open_side_panel: {
+                          suggested_key: {
+                            default: "Ctrl+Shift+Y",
+                            mac: "Command+Shift+Y"
+                          },
+                          description: "Toggle Bolex AI Side Panel"
+                        }
+                      },
+                      permissions: [
+                        "storage",
+                        "sidePanel",
+                        "activeTab",
+                        "scripting",
+                        "contextMenus"
+                      ],
+                      content_scripts: [
+                        {
+                          matches: ["<all_urls>"],
+                          js: ["content.js"],
+                          run_at: "document_start"
+                        }
+                      ],
+                      host_permissions: [
+                        "https://*/*",
+                        "http://*/*"
+                      ]
+                    }, null, 2);
+                    navigator.clipboard.writeText(manifestContent);
+                    setCopiedKey(true);
+                    setTimeout(() => setCopiedKey(false), 2000);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                  {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedKey ? 'Copied Manifest' : 'Copy manifest.json'}</span>
                 </button>
               </div>
-              <p className="text-[11px] text-neutral-400">
-                Press <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Ctrl+Shift+B</kbd> (or <kbd className="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200 font-mono text-[10px]">Cmd+Shift+B</kbd>) from any website or tab to trigger Bolex in popup or sidepanel mode.
-              </p>
+
+              <pre className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-[11px] font-mono text-amber-300/90 overflow-x-auto max-h-60 leading-relaxed">
+{`{
+  "manifest_version": 3,
+  "name": "Bolex AI - Browser Assistant & Workspace",
+  "version": "2.0.0",
+  "description": "Next-generation browser assistant powered by Bolex AI.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Bolex AI Assistant (Ctrl+Shift+B)",
+    "default_icon": { "16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting", "contextMenus"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "host_permissions": ["https://*/*", "http://*/*"]
+}`}
+              </pre>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
